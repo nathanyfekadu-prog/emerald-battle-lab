@@ -1,0 +1,13 @@
+This is Pokemon Battle Solver. Difficult ROM hacks usually mean testing the same fight by hand, resetting, and changing one move at a time. My project reads the battle directly from mGBA, searches for a winning sequence, and plays that sequence back in the real game.
+
+The judge mode needs no ROM. This sample comes from a connected Pokemon Run and Bun route: eight trainers, ninety-four battle turns, two deathless completions, and zero state reloads after either run started. It contains only sanitized state and recorder metadata.
+
+Strategy Lab keeps the planning tools together. Matchup compares complete lines. Contingencies shows what to do when the opponent takes another branch, and Turn Coach updates the recommendation after each observed turn. Calculator output helps rank choices, but it never gets the final word.
+
+Here is a live checkpoint before Trainer Chelle. The native libmgba bridge reads both parties, hit points, moves, the active matchup, and the trainer fingerprint. Search workers can restart this position in parallel without opening a pile of emulator windows.
+
+A proposed plan only earns the cartridge verified label after the emulator reaches the win and the recorder passes its proof checks. This connected route beat Corgi through Chelle twice. The longer recording includes Center visits, party preparation, every battle, and the final result.
+
+I built this with Codex and GPT five point six throughout Build Week. Codex helped trace the memory layout, build the C bridge, debug controller timing, compare failed replays against predicted state, and turn those failures into regression tests. The project now has one hundred and fifty passing tests.
+
+The current target is Pokemon Run and Bun on Emerald. It is not a universal Pokemon solver yet, and some verified routes still use saved cartridge playbooks when general search misses. What works today is the part I cared about most: read a real position, produce a strategy, and make the cartridge prove it.

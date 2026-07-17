@@ -1,0 +1,41 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# macOS and editor files
+.DS_Store
+.idea/
+.vscode/
+
+# Copyrighted game files and private player state
+*.gba
+*.gb
+*.gbc
+*.rom
+*.sav
+*.srm
+*.ss[0-9]
+*.sgm
+*.state
+
+# ROM patches: distribute only with the patch author's permission
+*.bps
+*.ips
+*.ups
+
+# Locally compiled emulator helper
+emulator/mgba_bridge
+
+# Generated runs, recordings, screenshots, and scratch data
+output/*
+!output/*.py
+tmp/
+test-results/
+results.json
+graphify-out/
+
+# Raw media produced before FFmpeg encoding
+*.rgba
+*.raw

@@ -1,0 +1,13 @@
+{
+  "id": "trainer-chelle-sing-backup",
+  "label": "Boss Trainer Chelle — Sing-hit recovery",
+  "trainer_ids": [54],
+  "starting_state": "output/simulator_runs/chelle-vital-spirit-v2-rng48-prebattle.ss0",
+  "trainers": [
+    {
+      "name": "Trainer Chelle",
+      "lines": ["output/simulator_runs/chelle-vital-spirit-v2-sing-backup-v2/search.json"]
+    }
+  ],
+  "transitions": []
+}

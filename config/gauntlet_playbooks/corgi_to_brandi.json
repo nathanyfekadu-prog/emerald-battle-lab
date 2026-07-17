@@ -1,0 +1,16 @@
+{
+  "id": "corgi-to-brandi",
+  "label": "Breeder Corgi and the following double battle",
+  "trainer_ids": [47, 48],
+  "starting_state": "output/gauntlet_runs/breeder-corgi-live-prebattle.ss0",
+  "trainers": [
+    {"name": "Breeder Corgi", "lines": ["output/gauntlet_runs/corgi-full-correct-controller/search.json"]},
+    {"name": "Brandi", "lines": ["output/gauntlet_runs/brandi-live-correct-controller-v2/search.json"]}
+  ],
+  "transitions": [
+    {
+      "to_center": "output/gauntlet_runs/routes/corgi-to-center.json",
+      "to_trainer": "output/gauntlet_runs/routes/center-to-brandi-coord.json"
+    }
+  ]
+}

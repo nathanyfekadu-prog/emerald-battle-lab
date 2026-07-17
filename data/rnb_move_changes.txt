@@ -1,0 +1,177 @@
+--- Page 1 ---
+Move BP PP AccuracyEffect ChanceType Move Change
+Absorb 20 > 40None None None None Covet No longer steal items.
+Aeroblast None None 95% > 100%None None Dark Void Usable by any Pokémon that can learn it.
+Air Cutter None None 95% > 100%None None Defend Order Functions like Protect.
+Air Slash None None 95% > 100%None None Destiny Bond Can be used multiple times without fail.
+Aqua Tail None None 90% > 95%None None Explosion Halves target's defense on damage calculation.
+Astonish 30 > 40None None None None Hidden Power Type determined by the Pokémon IVs, always has 60 BP.
+Baby-Doll EyesNone 30 > 10 None None None Misty Explosion Halves target's defense on damage calculation.
+Barrage None None 85% > 100%None None Self-Destruct Halves target's defense on damage calculation.
+Belch None None 90% > 100%None None Thief No longer steal items.
+Bind None None 85% > 100%None None Thunder Wave Electric-types cannot miss when using it.
+Blaze Kick None None 90% > 100%None None
+Blizzard None None 70% > 80%None None
+Blue Flare None None 85% > 90%None None
+Bolt Strike None None 85% > 90%None None
+Bone Club None None 85% > 100%None None
+Bonemerang None None 90% > 100%None None
+Bounce None None 85% > 95%None None
+Captivate None 20 > 5 None None None
+Charge Beam50 > 40None 90% > 100%70% > 100%None
+Charm None 20 > 5 None None None
+Circle Throw None None 90% > 95%None None
+Clamp None None 85% > 100%None None
+Comet PunchNone None 85% > 90%None None
+Confide None 20 > 10 None None None
+Covet None None None None Normal > Fairy
+CrabhammerNone None 90% > 100%None None
+Cross Chop None None 80% > 90%None None
+Cut None None 95% > 100%None None
+Dark Void None None 50% > 80%None None
+Diamond StormNone None 95% > 100%None None
+Double Hit None None 90% > 100%None None
+Double Slap None None 85% > 100%None None
+Draco MeteorNone None 90% > 100%None None
+Dragon RushNone None 75% > 85%None None
+Dragon Tail None None 90% > 95%None None
+Drill Run None None 95% > 100%None None
+Dual Chop None None 90% > 100%None None
+
+--- Page 2 ---
+Move BP PP AccuracyEffect ChanceType Move Change
+Dual WingbeatNone None 90% > 100%None None
+Eerie ImpulseNone 15 > 5 None None None
+Electroweb None None 95% > 100%None None
+Fake Out None 10 > 5 None None None
+Fake Tears None 20 > 5 None None None
+Feather DanceNone 15 > 5 None None None
+Fire Fang None None 95% > 100%None None
+Fire Spin None None 85% > 100%None None
+Flash None None 100% > 70%None None
+Fleur CannonNone None 90% > 100%None None
+Fly None None 95% > 100%None None
+Flying Press None None 95% > 100%None None
+Focus Blast None None 70% > 80%None None
+Freeze ShockNone None 90% > 100%None None
+Frenzy Plant None None 90% > 100%None None
+Frost Breath None None 90% > 100%None None
+Frustration ?? > 102None None None None
+Fury Attack None None 85% > 100%None None
+Fury Swipes None None 80% > 90%None None
+Gear Grind None None 85% > 100%None None
+Giga Impact None None 90% > 100%None None
+Glaciate None None 95% > 100%None None
+Grass WhistleNone None 55% > 70%None None
+Growl None 40 > 10 None None None
+Gunk Shot None None 80% > 85%None None
+Hammer ArmNone None 90% > 100%None None
+Harden None 40 > 5 None None None
+Head Smash None None 80% > 85%None None
+Heat Wave None None 90% > 100%None None
+High HorsepowerNone None 95% > 100%None None
+Hurricane None None 70% > 80%None None
+Hydro CannonNone None 90% > 100%None None
+Hydro Pump None None 80% > 85%None None
+Hyper Beam None None 90% > 100%None None
+Hyper Fang None None 90% > 100%None None
+Hypnosis None None 60% > 70%None None
+Ice Burn None None 90% > 100%None None
+
+--- Page 3 ---
+Move BP PP AccuracyEffect ChanceType Move Change
+Ice Fang None None 95% > 100%None None
+Ice Hammer None None 90% > 100%None None
+Icicle Crash None None 90% > 100%None None
+Icy Wind None None 95% > 100%None None
+Iron Tail None None 75% > 85%None None
+Kinesis None None 80% > 100%None None
+Leaf Storm None None 90% > 100%None None
+Leaf TornadoNone None 90% > 100%50% > 30%None
+Leech Seed None None 90% > 100%None None
+Leer None 30 > 10 None None None
+Lick 30 > 40None None None None
+Light of Ruin None None 90% > 100%None None
+Lovely Kiss None None 75% > 80%None None
+Magma StormNone None 75% > 90%None None
+Mega Drain 40 > 60None None None None
+Mega Kick None None 75% > 85%None None
+Mega Punch None None 85% > 100%None None
+Megahorn None None 85% > 90%None None
+Metal Claw None None 95% > 100%None None
+Metal Sound None 40 > 585% > 100%None None
+Meteor BeamNone None 90% > 100%None None
+Meteor MashNone None 90% > 100%None None
+Mirror Shot None None 85% > 100%30% > 20%None
+Misty Explosion100 > 200None None None None
+Mud Bomb None None 85% > 100%30% > 20%None
+Muddy WaterNone None 85% > 95%None None
+Nature's MadnessNone None 90% > 100%None None
+Night Daze None None 95% > 100%40% > 30%None
+Noble Roar None 30 > 10 None None None
+Octazooka 65 > 80None 85% > 100%50% > 30%None
+Origin Pulse None None 85% > 100%None None
+Overheat None None 90% > 100%None None
+Pin Missile None None 95% > 100%None None
+Play Nice None 20 > 10 None None None
+Play Rough None None 90% > 100%None None
+Poison PowderNone None 75% > 90%None None
+Power Whip None None 85% > 90%None None
+
+--- Page 4 ---
+Move BP PP AccuracyEffect ChanceType Move Change
+Precicipe BladesNone None 85% > 100%None None
+Psycho BoostNone None 90% > 100%None None
+Razor Leaf None None 95% > 100%None None
+Razor Shell None None 95% > 100%None None
+Return ?? > 102None None None None
+Roar of Time None None 90% > 100%None None
+Rock Blast None None 90% > 100%None None
+Rock Climb None None 85% > 95%None None
+Rock Slide None None 90% > 100%None None
+Rock Smash None None None 50% > 100%None
+Rock Throw None None 90% > 100%None None
+Rock WreckerNone None 90% > 100%None None
+Rolling Kick None None 85% > 100%None None
+Roost None 10 > 5 None None None
+Sacred Fire None None 95% > 100%None None
+Sand Tomb None None 85% > 100%None None
+Sand-Attack None 15 > 5 None None None
+Scale Shot None None 90% > 100%None None
+Screech None 15 > 585% > 100%None None
+Seed Flare None None 85% > 90%None None
+Sing None None 55% > 70%None None
+Skitter SmackNone None 90% > 100%None None
+Sky Attack None None 90% > 100%None None
+Sky UppercutNone None 90% > 100%None None
+Slam None None 75% > 90%None None
+Sleep PowderNone None 75% > 80%None None
+Smog None None 70% > 90%40% > 100%None
+Snarl None 15 > 1095% > 100%None None
+Sonic Boom None None 90% > 100%None None
+Spacial RendNone None 95% > 100%None None
+Steam EruptionNone None 95% > 100%None None
+Steel Beam None None 95% > 100%None None
+Steel Wing None None 90% > 100%None None
+Stone Edge None None 80% > 85%None None
+Strange SteamNone None 95% > 100%None None
+Struggle BugNone 20 > 10 None None None
+Stun Spore None None 75% > 90%None None
+
+--- Page 5 ---
+Move BP PP AccuracyEffect ChanceType Move Change
+Submission None None 80% > 100%None None
+Super Fang None None 90% > 100%None Normal > Dark
+Supersonic None None 55% > 70%None None
+Swagger None None 85% > 90%None None
+Sweet Kiss None None 75% > 80%None None
+Tail Slap None None 85% > 100%None None
+Take Down None None 85% > 100%None None
+Tearful Look None 20 > 10 None None None
+Thunder None None 70% > 80%None None
+Thunder CageNone None 90% > 100%None None
+Thunder FangNone None 95% > 100%None None
+Tickle None 20 > 10 None None None
+Whirlpool None None 85% > 100%None None
+Wrap None None 90% > 100%None None
+Zen HeadbuttNone None 90% > 100%None None

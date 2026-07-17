@@ -1,0 +1,21 @@
+{
+  "id": "trainer-chelle-alternate-lapras",
+  "label": "Boss Trainer Chelle — alternate Lapras answer",
+  "trainer_ids": [54],
+  "starting_state": "output/simulator_runs/chelle-vital-spirit-v2-prebattle.ss0",
+  "constraint": {
+    "enemy_roster_slot": 0,
+    "enemy": "Lapras",
+    "forbidden_party_slot": 2,
+    "forbidden_answer": "Hamilton",
+    "applies_until_enemy_faints": true,
+    "purpose": "Use a genuinely different answer when the preferred Lapras route requires a contingency"
+  },
+  "trainers": [
+    {
+      "name": "Trainer Chelle",
+      "lines": ["output/simulator_runs/chelle-alt-lapras-no-hamilton-wide/search.json"]
+    }
+  ],
+  "transitions": []
+}

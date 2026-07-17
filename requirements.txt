@@ -1,0 +1,11 @@
+# mgba Python bindings are not currently installable in this environment; the
+# app uses the local libmgba bridge in emulator/mgba_bridge.c instead.
+rich
+click
+numpy
+pytest
+fastapi
+uvicorn
+websockets
+reportlab
+pypdf

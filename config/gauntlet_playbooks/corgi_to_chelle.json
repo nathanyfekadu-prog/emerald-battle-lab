@@ -1,0 +1,36 @@
+{
+  "id": "corgi-to-chelle",
+  "label": "Breeder Corgi through Trainer Chelle",
+  "trainer_ids": [47, 48, 49, 50, 51, 52, 53, 54],
+  "starting_state": "output/gauntlet_runs/breeder-corgi-live-prebattle.ss0",
+  "trainers": [
+    {"name": "Breeder Corgi", "lines": ["output/gauntlet_runs/corgi-full-correct-controller/search.json"]},
+    {"name": "Brandi", "lines": ["output/gauntlet_runs/brandi-live-correct-controller-v2/search.json"]},
+    {"name": "Luna", "lines": ["output/gauntlet_runs/luna-live-correct-controller-v2/search.json"]},
+    {"name": "Dylan", "lines": ["output/gauntlet_runs/dylan-live-correct-controller-v2/search.json"]},
+    {"name": "Maria", "lines": ["output/gauntlet_runs/maria-live-correct-controller-v2/search.json"]},
+    {"name": "Isaac", "lines": ["output/gauntlet_runs/isaac-live-correct-controller-v2/search.json"]},
+    {"name": "Anna And Meg", "lines": ["output/gauntlet_runs/anna-meg-rah-carnivine-resume/search.json"]},
+    {"name": "Trainer Chelle", "lines": ["output/gauntlet_runs/chelle-prepared-team-search/search.json"]}
+  ],
+  "transitions": [
+    {"to_center": "output/gauntlet_runs/routes/corgi-to-center.json", "to_trainer": "output/gauntlet_runs/routes/center-to-brandi-coord.json"},
+    {"to_center": "output/gauntlet_runs/routes/brandi-to-center.json", "to_trainer": "output/gauntlet_runs/routes/center-to-luna.json"},
+    {"to_center": "output/gauntlet_runs/routes/luna-to-center.json", "to_trainer": "output/gauntlet_runs/routes/center-to-dylan.json"},
+    {"to_center": "output/gauntlet_runs/routes/dylan-to-center.json", "to_trainer": "output/gauntlet_runs/routes/center-to-maria.json"},
+    {"to_center": "output/gauntlet_runs/routes/maria-to-center.json", "to_trainer": "output/gauntlet_runs/routes/center-to-isaac.json"},
+    {
+      "to_center": "output/gauntlet_runs/routes/isaac-to-center.json",
+      "to_trainer": "output/gauntlet_runs/routes/center-to-anna-meg.json",
+      "preparation": {
+        "party": [
+          {"source": "party", "slot": 1}, {"source": "box", "box": 1, "slot": 7},
+          {"source": "box", "box": 1, "slot": 3}, {"source": "box", "box": 1, "slot": 5},
+          {"source": "party", "slot": 3}, {"source": "box", "box": 1, "slot": 10}
+        ],
+        "item_donor_boxes": [1]
+      }
+    },
+    {"to_center": "output/gauntlet_runs/routes/anna-meg-to-center.json", "to_trainer": "output/gauntlet_runs/routes/center-to-chelle-adjacent.json", "final_direction": "RIGHT"}
+  ]
+}

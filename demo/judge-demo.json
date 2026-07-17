@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "title": "Breeder Corgi through Trainer Chelle",
+  "description": "Sanitized evidence from a connected Pokemon Run & Bun route. This sample contains no ROM, save state, extracted sprites, or game audio.",
+  "proof": {
+    "status": "cartridge-verified",
+    "uncut": true,
+    "repeat_runs": 2,
+    "repeat_deathless_wins": 2,
+    "savestate_loads_after_start": 0,
+    "graveyard_used": false,
+    "trainer_count": 8,
+    "turn_count": 94,
+    "center_heals": 7
+  },
+  "route": [
+    {"trainer": "Breeder Corgi", "turns": 12, "ending_player_hp": [25, 39, 37, 1, 92, 0]},
+    {"trainer": "Psychic Brandi & Battle Girl Aisha", "turns": 6, "ending_player_hp": [53, 2, 26, 95, 92, 0]},
+    {"trainer": "Battle Girl Luna", "turns": 18, "ending_player_hp": [14, 79, 37, 8, 55, 0]},
+    {"trainer": "Triathlete Dylan", "turns": 7, "ending_player_hp": [39, 67, 31, 95, 92, 0]},
+    {"trainer": "Triathlete Maria", "turns": 7, "ending_player_hp": [58, 15, 99, 95, 92, 0]},
+    {"trainer": "Breeder Isaac", "turns": 12, "ending_player_hp": [49, 5, 45, 16, 12, 0]},
+    {"trainer": "Sr. and Jr. Anna and Meg", "turns": 9, "ending_player_hp": [101, 1, 68, 79, 23, 11]},
+    {"trainer": "Trainer Chelle", "turns": 23, "ending_player_hp": [20, 95, 4, 46, 13, 17]}
+  ],
+  "sample_battle": {
+    "trainer": "Trainer Chelle Daycare [Boss]",
+    "location": "Rusturf Tunnel",
+    "player_active": "Rah",
+    "player_moves": ["Mud Shot", "Bite", "Double Kick", "Sludge Bomb"],
+    "enemy_active": "Lapras",
+    "enemy_moves": ["Frost Breath", "Thunderbolt", "Body Press", "Sing"],
+    "enemy_party": ["Lapras", "Rhydon", "Togekiss", "Vespiquen", "Slowbro-Galar", "Delcatty"]
+  },
+  "pipeline": [
+    "Read the live battle state from mGBA memory",
+    "Search moves, switches, and contingency branches",
+    "Replay the selected policy through emulator inputs",
+    "Reject the result unless the cartridge reaches a verified win"
+  ],
+  "artifact_note": "The public submission should link the short demo and longer uncut proof videos. Large local recordings are intentionally excluded from the repository."
+}

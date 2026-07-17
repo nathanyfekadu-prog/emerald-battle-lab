@@ -1,0 +1,81 @@
+----------------
+Mechanic Changes
+----------------
+
+For any mechanic that's not described in here, assume Generation 8 mechanics.
+
+Battle style is forced to set.
+Bag is unacessible during trainer battles.
+Gym Trainers and Gym Leaders will heal your party to full before battle.
+EVs are removed from the game.
+TMs are consumed on use.
+HMs do not need to be taught, obtaining them plus the required badge for use is enough.
+HMs can be used inside the Trick House even without ever acquiring them.
+
+Critical hit chance: 1/16.
+Critical hit damage multiplier: 1.5.
+
+Infatuation: Status condition not limited by gender.
+Paralysis: Speed decreases by 75%.
+Sleep: If a Pokémon enters a battle asleep it's sleeping turns count is reset.
+
+Disguise: No damage taken as the Disguise is broken.
+Gale Wings: Will always boost the priority of Flying-type moves, regardless of HP.
+Magma Armor: Prevents critical-hits on top of it's existing effects.
+Moody: Can still raise Accuracy and Evasion.
+
+Synchronize: Leading with a Synchronize Pokémon gives you a 50% chance to force their nature on a wild encounter.
+Weather abilities: Will set Weather permanently.
+Terrain abilities: Will set Terrain permanently.
+Terrain damage boost: Electric/Grass/Psychic Terrains will boost damage of moves of the matching type by 50%.
+Terrain removal: Not removed by Defog, still removed by Steel Roller.
+
+Held items: Items that get consumed or removed from your Pokémon in any way during battle will not be restored.
+Confuse inducing berries: Restore half HP, triggering at 1/4 HP.
+Soul Dew: Boosts Latias and Latios SpA/SpD by one stage.
+
+Safari Balls: 100% catch rate.
+
+Berries cannot be planted.
+Pokémon with Magic Guard or Poison Heal as an ability will not take overworld damage from being poisoned.
+Fishing always guaranteed to heel without precise timing.
+Old Rod and Good Rod have been removed, fishing table reworked so the Super Rod table has 10 possible encounters.
+
+Overworld Weather
+Rainy - summons permanent Rain Dance, seen in Routes 119, 120, 123, 129, 130, 131.
+Thunderstorm - summons permanent Rain Dance and Electric Terrain, seen in Routes 119 and 129.
+Drought - summons permanent Sunny Day, seen in routes 129 and 131.
+Snow - summons permanent Hail, seen in Sootopolis Gym underground.
+
+Other Unique Overworld Effects
+Permanent Tailwind running against you - seen in Mt. Pyre's peak.
+Permanent Magma Storm affecting all of your party - seen in Groudon's room at Magma Hideout .
+Permanent Aurora Veil set up for the opponent (can still be broken or Defogged away) - seen in Seafloor Cavern.
+
+Level Cap
+Once a Pokémon reaches a level cap the Endless Candy item will no longer work and the Pokémon will not gain any experience in battles or Day Care. The level cap is tied boss fights and raised as you defeat them, progressing through the story. The boss fights are noted in documentation and are also noticeable by the battle transition as they start. You can overcome the cap by using Rare Candies, but those are rare and limited.
+Here is a list of all the bosses and their matching level caps:
+
+Route 104 Aqua Grunt 		lvl 12
+Museum Aqua Grunts 		lvl 17
+Leader Brawly 			lvl 21
+Leader Roxanne 			lvl 25
+Route 117 Chelle 		lvl 32
+Leader Wattson 			lvl 35
+Cycling Road Rival 		lvl 38
+Leader Norman 			lvl 42
+Fallarbor Town Vito 		lvl 48
+Mt. Chimney Maxie 		lvl 54
+Leader Flannery 		lvl 57
+Weather Institute Shelly 	lvl 65
+Route 119 Rival 		lvl 66
+Leader Winona 			lvl 69
+Lilycove City Rival 		lvl 73
+Mt. Pyre Archie 		lvl 76
+Magma Hideout Maxie 		lvl 79
+Aqua Hideout Matt 		lvl 81
+Leaders Tate & Liza 		lvl 85
+Seafloor Cavern Archie	 	lvl 89
+Leader Juan 			lvl 91
+Victory Road Vito 		lvl 95
+Champion Wallace		lvl 99

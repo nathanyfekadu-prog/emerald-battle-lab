@@ -1,0 +1,17 @@
+{
+  "id": "trainer-chelle",
+  "label": "Boss Trainer Chelle",
+  "trainer_ids": [54],
+  "starting_state": "output/simulator_runs/chelle-vital-spirit-v2-prebattle.ss0",
+  "trainers": [
+    {
+      "name": "Trainer Chelle",
+      "lines": ["output/simulator_runs/chelle-vital-spirit-v2-main/search.json"]
+    }
+  ],
+  "transitions": [],
+  "contingency_playbooks": [
+    "config/gauntlet_playbooks/trainer_chelle_sing_backup.json",
+    "config/gauntlet_playbooks/trainer_chelle_alternate_lapras.json"
+  ]
+}
