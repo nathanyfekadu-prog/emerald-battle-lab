@@ -10,11 +10,12 @@ from typing import Any
 
 from battle.action import Action
 from battle.battle_state import BattleState
-from trainer_data.loader import load_trainer_battles
+from trainer_data.loader import load_trainer_battles_for_mode, normalize_game_mode
 from trainer_data.models import TrainerBattle, TrainerPokemon
 
 
 DEFAULT_CALC_DATA_PATH = Path(__file__).resolve().parents[1] / "data" / "calc_data.json"
+DEFAULT_GEN3_CALC_DATA_PATH = Path(__file__).resolve().parents[1] / "data" / "calc_data_gen3.json"
 DEFAULT_TRAINER_DATA_PATH = Path(__file__).resolve().parents[1] / "data" / "trainer_battles.json"
 STAT_NAMES = {"hp", "atk", "def", "spa", "spd", "spe"}
 BOOSTABLE_STATS = {"atk", "def", "spa", "spd", "spe"}
@@ -166,6 +167,7 @@ class PokemonCalcSet:
     gender: str | None = None
     ability_on: bool = True
     allies_fainted: int = 0
+    stat_overrides: dict[str, int] | None = None
 
 
 @dataclass(frozen=True)
@@ -276,6 +278,7 @@ def _calc_set_cache_key(s: PokemonCalcSet) -> tuple:
         s.ability, s.held_item, s.status,
         tuple(sorted(s.boosts.items())) if s.boosts else None,
         s.gender, s.ability_on, s.allies_fainted,
+        tuple(sorted(s.stat_overrides.items())) if s.stat_overrides else None,
     )
 
 
@@ -292,8 +295,13 @@ class DamageCalculator:
         data_path: str | Path = DEFAULT_CALC_DATA_PATH,
         *,
         default_field: FieldState | None = None,
+        game_mode: str = "run-and-bun",
     ):
-        self.data_path = Path(data_path)
+        self.game_mode = normalize_game_mode(game_mode)
+        selected_path = data_path
+        if self.game_mode == "pokemon-emerald" and Path(data_path) == DEFAULT_CALC_DATA_PATH:
+            selected_path = DEFAULT_GEN3_CALC_DATA_PATH
+        self.data_path = Path(selected_path)
         self.data = _load_calc_data(self.data_path)
         self.species = self.data.get("species", {})
         self.species_by_num = {int(key): value for key, value in self.data.get("speciesByNum", {}).items()}
@@ -932,7 +940,10 @@ class DamageCalculator:
         species = mon.species
         level = mon.level or 50
         species_data = self._species_data(species)
-        max_hp = self._stat(species_data, "hp", level, mon.nature, None, None) if species_data else None
+        exact_stats = mon.exact_stats or {}
+        max_hp = exact_stats.get("hp")
+        if max_hp is None and species_data:
+            max_hp = self._stat(species_data, "hp", level, mon.nature, None, None)
         return KnownPokemonSet(
             pokemon=PokemonCalcSet(
                 species=species,
@@ -942,15 +953,16 @@ class DamageCalculator:
                 hp=max_hp,
                 ability=mon.ability,
                 held_item=mon.held_item,
+                stat_overrides=exact_stats or None,
             ),
             moves=tuple(mon.moves),
         )
 
     def _load_trainer_battles(self) -> list[TrainerBattle]:
         if self._trainer_battles is None:
-            if DEFAULT_TRAINER_DATA_PATH.is_file():
-                self._trainer_battles = load_trainer_battles(DEFAULT_TRAINER_DATA_PATH)
-            else:
+            try:
+                self._trainer_battles = load_trainer_battles_for_mode(self.game_mode)
+            except (OSError, ValueError, KeyError):
                 self._trainer_battles = []
         return self._trainer_battles
 
@@ -969,7 +981,9 @@ class DamageCalculator:
         context: DamageContext,
         modifiers: list[str],
     ) -> int:
-        value = self._stat(species, stat_name, pokemon.level, pokemon.nature, pokemon.evs, pokemon.ivs)
+        value = int((pokemon.stat_overrides or {}).get(stat_name) or 0)
+        if value <= 0:
+            value = self._stat(species, stat_name, pokemon.level, pokemon.nature, pokemon.evs, pokemon.ivs)
         stage = max(-6, min(6, (pokemon.boosts or {}).get(stat_name, 0)))
         if critical and ((is_attacker and stage < 0) or (not is_attacker and stage > 0)):
             stage = 0
@@ -1219,7 +1233,7 @@ class DamageCalculator:
             modifier *= 0.5
             modifiers.append("Misty Terrain")
         if context.spread or (context.field.is_doubles and _is_spread_move(move)):
-            modifier *= 0.75
+            modifier *= 0.5 if self.game_mode == "pokemon-emerald" else 0.75
             modifiers.append("spread")
         if context.field.is_helping_hand:
             modifier *= 1.5
@@ -1243,7 +1257,7 @@ class DamageCalculator:
             modifier *= 2 / 3
             modifiers.append("Flower Gift defender ally")
         if context.critical:
-            modifier *= 1.5
+            modifier *= 2.0 if self.game_mode == "pokemon-emerald" else 1.5
             modifiers.append("critical")
         if _screen_applies(move, category, context):
             modifier *= 2 / 3 if context.field.is_doubles else 0.5
@@ -1337,11 +1351,12 @@ class DamageCalculator:
         return multiplier
 
 
-@lru_cache(maxsize=1)
-def default_calculator() -> DamageCalculator | None:
-    if not DEFAULT_CALC_DATA_PATH.is_file():
+@lru_cache(maxsize=2)
+def default_calculator(game_mode: str = "run-and-bun") -> DamageCalculator | None:
+    path = DEFAULT_GEN3_CALC_DATA_PATH if normalize_game_mode(game_mode) == "pokemon-emerald" else DEFAULT_CALC_DATA_PATH
+    if not path.is_file():
         return None
-    return DamageCalculator(DEFAULT_CALC_DATA_PATH)
+    return DamageCalculator(path, game_mode=game_mode)
 
 
 def _load_calc_data(path: Path) -> dict[str, Any]:

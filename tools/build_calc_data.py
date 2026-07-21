@@ -10,41 +10,46 @@ from pathlib import Path
 
 SCRIPT = r"""
 const {Dex} = require('@pkmn/dex');
+const {Generations} = require('@pkmn/data');
 
-const generation = Number(process.argv[2] || 9);
-const gen = Dex.mod(`gen${generation}`);
+// With `node -e`, the first argument after the script is argv[1].  Using argv[2]
+// silently built the default generation regardless of --generation.
+const generation = Number(process.argv[1] || 9);
+const gen = new Generations(Dex).get(generation);
 
 const species = {};
 const speciesByNum = {};
-for (const item of gen.species.all()) {
-  if (!item.exists || item.num <= 0) continue;
+for (const item of gen.species) {
+  const num = Dex.species.get(item.id).num || 0;
+  if (num <= 0) continue;
   species[item.id] = {
     id: item.id,
-    num: item.num,
+    num,
     name: item.name,
     types: item.types,
     baseStats: item.baseStats,
-    evos: item.evos || [],
+    evos: Dex.species.get(item.id).evos || [],
   };
-  if (!speciesByNum[item.num]) speciesByNum[item.num] = item.id;
+  if (!speciesByNum[num]) speciesByNum[num] = item.id;
 }
 
 const moves = {};
 const movesByNum = {};
-for (const item of gen.moves.all()) {
-  if (!item.exists || !item.id) continue;
+for (const item of gen.moves) {
+  if (!item.id) continue;
+  const raw = Dex.moves.get(item.id);
   moves[item.id] = {
     id: item.id,
-    num: item.num || 0,
+    num: raw.num || 0,
     name: item.name,
     type: item.type,
     category: item.category,
     basePower: item.basePower || 0,
-    accuracy: item.accuracy === true ? 100 : item.accuracy || 100,
+    accuracy: raw.accuracy === true ? 100 : raw.accuracy || 100,
     priority: item.priority || 0,
     target: item.target || "normal",
     flags: item.flags || {},
-    secondary: item.secondary || null,
+    secondary: raw.secondary || null,
     secondaries: item.secondaries || null,
     hasSecondary: item.secondaries || item.secondary ? true : false,
     recoil: item.recoil || null,
@@ -52,30 +57,28 @@ for (const item of gen.moves.all()) {
     ignoreDefensive: !!item.ignoreDefensive,
     overrideDefensiveStat: item.overrideDefensiveStat || null,
   };
-  if (item.num && item.num > 0 && !movesByNum[item.num]) movesByNum[item.num] = item.id;
+  if (raw.num && raw.num > 0 && !movesByNum[raw.num]) movesByNum[raw.num] = item.id;
 }
 
 const items = {};
 const itemsByNum = {};
-for (const item of gen.items.all()) {
-  if (!item.exists || !item.id) continue;
+for (const item of gen.items) {
+  if (!item.id) continue;
+  const num = Dex.items.get(item.id).num || 0;
   items[item.id] = {
     id: item.id,
-    num: item.num || 0,
+    num,
     name: item.name,
   };
-  if (item.num && item.num > 0 && !itemsByNum[item.num]) itemsByNum[item.num] = item.id;
+  if (num > 0 && !itemsByNum[num]) itemsByNum[num] = item.id;
 }
 
 const typeChart = {};
-for (const attackingType of gen.types.all()) {
-  if (!attackingType.exists) continue;
+for (const attackingType of gen.types) {
   typeChart[attackingType.name] = {};
-  for (const defendingType of gen.types.all()) {
-    if (!defendingType.exists || !defendingType.damageTaken) continue;
-    const value = defendingType.damageTaken[attackingType.name] || 0;
+  for (const defendingType of gen.types) {
     typeChart[attackingType.name][defendingType.name] =
-      value === 1 ? 2 : value === 2 ? 0.5 : value === 3 ? 0 : 1;
+      attackingType.effectiveness[defendingType.name] ?? 1;
   }
 }
 

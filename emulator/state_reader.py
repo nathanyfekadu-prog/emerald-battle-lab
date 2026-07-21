@@ -38,6 +38,20 @@ _BATTLE_MON_HP_OFFSET = 0x2A
 _BATTLE_MON_MAX_HP_OFFSET = 0x2E
 _BATTLER_PARTY_INDEXES_ADDRESS = 0x020233E6
 
+# US Pokémon Emerald (BPEE) live RAM. Run & Bun relocates and expands these
+# structures, so this profile is selected only when its live party agrees with
+# Emerald's SaveBlock1 pointer.
+_EMERALD_PLAYER_PARTY_BASE = 0x020244EA  # struct start minus two
+_EMERALD_ENEMY_PARTY_BASE = 0x02024742  # struct start minus two
+_EMERALD_BATTLE_MONS_ADDRESS = 0x02024084
+_EMERALD_BATTLE_MON_SIZE = 0x58
+_EMERALD_BATTLE_MON_HP_OFFSET = 0x28
+_EMERALD_BATTLE_MON_MAX_HP_OFFSET = 0x2C
+# `gBattlersCount` is at 0x0202406C in US Emerald. The following u16-aligned
+# array begins at 0x0202406E. Reading from the count byte made duplicate-species
+# teams (Rick's two Wurmple) look as if slot zero stayed active forever.
+_EMERALD_BATTLER_PARTY_INDEXES_ADDRESS = 0x0202406E
+
 
 @dataclass(frozen=True)
 class MemoryMap:
@@ -66,20 +80,51 @@ class StateReader:
         self.instance = instance
         self.memory = memory_map or MemoryMap()
         self._explicit_memory_map = memory_map is not None
+        self._vanilla_emerald = False if memory_map is not None else self._detect_vanilla_emerald()
+        if self._vanilla_emerald:
+            self.memory = replace(
+                self.memory,
+                player_party_base=_EMERALD_PLAYER_PARTY_BASE,
+                enemy_party_base=_EMERALD_ENEMY_PARTY_BASE,
+                player_hp_offset=0x58,
+                player_max_hp_offset=0x5A,
+                enemy_hp_offset=0x58,
+                enemy_max_hp_offset=0x5A,
+                player_active_hp=None,
+                player_active_max_hp=None,
+            )
+        self._battle_mons_address = _EMERALD_BATTLE_MONS_ADDRESS if self._vanilla_emerald else _BATTLE_MONS_ADDRESS
+        self._battle_mon_size = _EMERALD_BATTLE_MON_SIZE if self._vanilla_emerald else _BATTLE_MON_SIZE
+        self._battle_mon_hp_offset = _EMERALD_BATTLE_MON_HP_OFFSET if self._vanilla_emerald else _BATTLE_MON_HP_OFFSET
+        self._battle_mon_max_hp_offset = _EMERALD_BATTLE_MON_MAX_HP_OFFSET if self._vanilla_emerald else _BATTLE_MON_MAX_HP_OFFSET
+        self._battler_party_indexes_address = _EMERALD_BATTLER_PARTY_INDEXES_ADDRESS if self._vanilla_emerald else _BATTLER_PARTY_INDEXES_ADDRESS
         self._rom_bytes: bytes | None = None
         self._move_names_base: int | None = None
+        # Names and encrypted species data are immutable for the duration of a
+        # battle trial. Decoding them on every poll used hundreds of bridge
+        # requests per turn, while adding no new information.
+        self._player_names_cache: list[str] | None = None
+        self._enemy_names_cache: list[str] | None = None
+        self._player_species_cache: list[int] | None = None
+        self._enemy_species_cache: list[int] | None = None
 
     def read(self) -> BattleState:
         if self.memory.read_player_party_structs:
-            player_hp = self._read_party_hp(self.memory.player_party_base, self.memory.player_hp_offset)
-            player_max_hp = self._read_party_hp(self.memory.player_party_base, self.memory.player_max_hp_offset)
+            player_hp, player_max_hp = self._read_party_hp_pair(
+                self.memory.player_party_base,
+                self.memory.player_hp_offset,
+                self.memory.player_max_hp_offset,
+            )
         else:
             player_hp = [0] * 6
             player_max_hp = [0] * 6
 
         if self.memory.read_enemy_party_structs:
-            enemy_hp = self._read_party_hp(self.memory.enemy_party_base, self.memory.enemy_hp_offset)
-            enemy_max_hp = self._read_party_hp(self.memory.enemy_party_base, self.memory.enemy_max_hp_offset)
+            enemy_hp, enemy_max_hp = self._read_party_hp_pair(
+                self.memory.enemy_party_base,
+                self.memory.enemy_hp_offset,
+                self.memory.enemy_max_hp_offset,
+            )
         else:
             enemy_hp = [0] * 6
             enemy_max_hp = [0] * 6
@@ -103,6 +148,8 @@ class StateReader:
             self.instance.read_u8(config.RUN_BUN_BATTLE_COMMAND_PHASE)
             if hasattr(self.instance, "read_u8") else 0
         )
+        if self._vanilla_emerald and any(enemy_max_hp):
+            command_phase = 1
         if self._explicit_memory_map:
             # Unit/custom maps intentionally supply a dedicated active-HP
             # address and expect it to be authoritative. The production Run &
@@ -116,6 +163,15 @@ class StateReader:
             self._apply_battler_hp_overrides(
                 enemy_hp, enemy_max_hp, enemy_battlers, enemy_active_slots
             )
+            if self._vanilla_emerald and not is_doubles and enemy_active_slots:
+                # Emerald sends a trainer's party in order. The encrypted party
+                # copy is not refreshed immediately when an opposing mon faints,
+                # so clear already-passed slots once the live battler index moves
+                # forward. This keeps the first of two identical Wurmple dead.
+                active_enemy = enemy_active_slots[0]
+                if active_enemy is not None:
+                    for slot in range(active_enemy):
+                        enemy_hp[slot] = 0
 
         outcome = self.instance.read_u16(self.memory.battle_outcome)
         player_all_fainted = self._all_present_fainted(player_hp, player_max_hp)
@@ -145,29 +201,35 @@ class StateReader:
             player_won=player_won,
             is_doubles=is_doubles,
             menu_ready=menu_ready,
-            player_names=self._read_party_names(self.memory.player_party_base),
-            enemy_names=self._read_enemy_names(),
+            player_names=self._cached_player_names(),
+            enemy_names=self._cached_enemy_names(),
             player_move_names=player_move_names,
             player_move_names_by_slot=self._move_names_by_party_slot(
-                player_battlers, player_active_slots
+                player_battlers, player_active_slots, {player_battlers[0]: player_move_ids}
             ),
             player_move_ids=player_move_ids,
             enemy_move_names=enemy_move_names,
             enemy_move_ids=enemy_move_ids,
             enemy_move_names_by_slot=self._move_names_by_party_slot(
-                enemy_battlers, enemy_active_slots
+                enemy_battlers, enemy_active_slots, {enemy_battlers[0]: enemy_move_ids}
             ),
-            player_species=self._read_party_species(self.memory.player_party_base),
-            enemy_species=self._read_party_species(self.memory.enemy_party_base),
+            player_species=self._cached_player_species(),
+            enemy_species=self._cached_enemy_species(),
             player_active_slots=player_active_slots,
             enemy_active_slots=enemy_active_slots,
         )
 
     def wait_for_menu(self, timeout_frames: int = 500) -> bool:
+        # menu_ready is derived solely from these two live words. Reading and
+        # decrypting the entire battle state every frame was equivalent but far
+        # more expensive, especially when the visual fallback is expected to
+        # handle vanilla Emerald's differently placed command flag.
         for _ in range(timeout_frames):
-            state = self.read()
-            if state.menu_ready or state.battle_over:
-                return state.menu_ready
+            outcome = self.instance.read_u16(self.memory.battle_outcome)
+            if outcome in (1, 2):
+                return False
+            if self.instance.read_u16(self.memory.menu_ready_flag) != 0:
+                return True
             self.instance.advance_frames(1)
         return False
 
@@ -185,9 +247,9 @@ class StateReader:
         )
         battlers = (0, 2) if battle_type & 1 else (0,)
         for battler in battlers:
-            address = _BATTLE_MONS_ADDRESS + battler * _BATTLE_MON_SIZE
-            hp = self.instance.read_u16(address + _BATTLE_MON_HP_OFFSET)
-            max_hp = self.instance.read_u16(address + _BATTLE_MON_MAX_HP_OFFSET)
+            address = self._battle_mons_address + battler * self._battle_mon_size
+            hp = self.instance.read_u16(address + self._battle_mon_hp_offset)
+            max_hp = self.instance.read_u16(address + self._battle_mon_max_hp_offset)
             if 0 < max_hp <= 999 and hp == 0:
                 return True
         return False
@@ -239,6 +301,63 @@ class StateReader:
             address = base + slot * self.memory.party_struct_size + offset
             values.append(self.instance.read_u16(address))
         return values
+
+    def _read_party_hp_pair(
+        self, base: int, hp_offset: int, max_hp_offset: int
+    ) -> tuple[list[int], list[int]]:
+        """Read all live party HP in one bridge snapshot.
+
+        The previous implementation issued 24 synchronous bridge commands for
+        the two HP fields on one side. A single contiguous RAM read is both
+        faster and more internally consistent. Custom/fake instances retain the
+        old scalar fallback.
+        """
+        read_block = getattr(self.instance, "read_block", None)
+        if callable(read_block):
+            length = 5 * self.memory.party_struct_size + max(hp_offset, max_hp_offset) + 2
+            try:
+                raw = read_block(base, length)
+                if len(raw) >= length:
+                    hp = [
+                        int.from_bytes(
+                            raw[slot * self.memory.party_struct_size + hp_offset:
+                                slot * self.memory.party_struct_size + hp_offset + 2],
+                            "little",
+                        )
+                        for slot in range(6)
+                    ]
+                    max_hp = [
+                        int.from_bytes(
+                            raw[slot * self.memory.party_struct_size + max_hp_offset:
+                                slot * self.memory.party_struct_size + max_hp_offset + 2],
+                            "little",
+                        )
+                        for slot in range(6)
+                    ]
+                    return hp, max_hp
+            except Exception:
+                pass
+        return self._read_party_hp(base, hp_offset), self._read_party_hp(base, max_hp_offset)
+
+    def _cached_player_names(self) -> list[str]:
+        if self._player_names_cache is None:
+            self._player_names_cache = self._read_party_names(self.memory.player_party_base)
+        return list(self._player_names_cache)
+
+    def _cached_enemy_names(self) -> list[str]:
+        if self._enemy_names_cache is None:
+            self._enemy_names_cache = self._read_enemy_names()
+        return list(self._enemy_names_cache)
+
+    def _cached_player_species(self) -> list[int]:
+        if self._player_species_cache is None:
+            self._player_species_cache = self._read_party_species(self.memory.player_party_base)
+        return list(self._player_species_cache)
+
+    def _cached_enemy_species(self) -> list[int]:
+        if self._enemy_species_cache is None:
+            self._enemy_species_cache = self._read_party_species(self.memory.enemy_party_base)
+        return list(self._enemy_species_cache)
 
     def _read_party_names(self, base: int) -> list[str]:
         if not hasattr(self.instance, "read_u8"):
@@ -300,7 +419,7 @@ class StateReader:
             return 0
         order = SUBSTRUCT_ORDERS[personality % 24]
         chunks = [secure[index * 12 : (index + 1) * 12] for index in range(4)]
-        growth = {kind: chunks[index] for index, kind in enumerate(order)}[0]
+        growth = {kind: chunks[physical_index] for kind, physical_index in enumerate(order)}[0]
         species_id = _u16(growth, 0)
         # Run & Bun has an expanded species table; cap defensively so a bad decode can't
         # inject an absurd id.
@@ -335,8 +454,8 @@ class StateReader:
         if not hasattr(self.instance, "rom_path"):
             return [0] * 4
         address = (
-            _BATTLE_MONS_ADDRESS
-            + battler * _BATTLE_MON_SIZE
+            self._battle_mons_address
+            + battler * self._battle_mon_size
             + _BATTLE_MON_MOVES_OFFSET
         )
         ids = [self.instance.read_u16(address + index * 2) for index in range(4)]
@@ -347,14 +466,22 @@ class StateReader:
 
     def _move_names(self, move_ids: list[int]) -> list[str]:
         return [
-            self._move_name(move_id) or f"Unknown move {index + 1}"
+            (self._move_name(move_id) or f"Unknown move {index + 1}") if move_id else ""
             for index, move_id in enumerate(move_ids)
         ]
 
     def _read_active_party_slots(self, battlers: tuple[int, ...]) -> tuple[int | None, ...]:
+        if self._vanilla_emerald:
+            return tuple(
+                value if 0 <= value < 6 else None
+                for value in (
+                    self.instance.read_u16(self._battler_party_indexes_address + battler * 2)
+                    for battler in battlers
+                )
+            )
         slots: list[int | None] = []
         for battler in battlers:
-            value = self.instance.read_u16(_BATTLER_PARTY_INDEXES_ADDRESS + battler * 2)
+            value = self.instance.read_u16(self._battler_party_indexes_address + battler * 2)
             slots.append(value if 0 <= value < 6 else None)
         return tuple(slots)
 
@@ -362,12 +489,13 @@ class StateReader:
         self,
         battlers: tuple[int, ...],
         party_slots: tuple[int | None, ...],
+        known_ids: dict[int, list[int]] | None = None,
     ) -> list[list[str]]:
         names_by_slot = [[] for _ in range(6)]
         for battler, party_slot in zip(battlers, party_slots):
             if party_slot is not None:
                 names_by_slot[party_slot] = self._move_names(
-                    self._read_battler_move_ids(battler)
+                    (known_ids or {}).get(battler) or self._read_battler_move_ids(battler)
                 )
         return names_by_slot
 
@@ -381,15 +509,24 @@ class StateReader:
         rom = self._get_rom_bytes()
         if offset < 0 or offset + _ROM_MOVE_NAME_LENGTH > len(rom):
             return ""
-        return self._decode_game_bytes(rom[offset : offset + _ROM_MOVE_NAME_LENGTH])
+        decoded = self._decode_game_bytes(rom[offset : offset + _ROM_MOVE_NAME_LENGTH])
+        return decoded.title() if decoded.isupper() else decoded
 
     def _get_move_names_base(self) -> int | None:
         if self._move_names_base is not None:
             return self._move_names_base
         rom = self._get_rom_bytes()
-        encoded_pound = self._encode_game_string("Pound")
-        index = rom.find(encoded_pound)
-        self._move_names_base = index if index >= 0 else None
+        for pound in ("Pound", "POUND"):
+            encoded_pound = self._encode_game_string(pound)
+            index = rom.find(encoded_pound)
+            while index >= 0:
+                next_name = self._decode_game_bytes(
+                    rom[index + _ROM_MOVE_NAME_LENGTH : index + _ROM_MOVE_NAME_LENGTH * 2]
+                )
+                if next_name.casefold() == "karate chop":
+                    self._move_names_base = index
+                    return self._move_names_base
+                index = rom.find(encoded_pound, index + 1)
         return self._move_names_base
 
     def _get_rom_bytes(self) -> bytes:
@@ -439,9 +576,9 @@ class StateReader:
         for battler, party_slot in zip(battlers, party_slots):
             if party_slot is None or party_slot < 0 or party_slot >= len(hp):
                 continue
-            address = _BATTLE_MONS_ADDRESS + battler * _BATTLE_MON_SIZE
-            live_hp = self.instance.read_u16(address + _BATTLE_MON_HP_OFFSET)
-            live_max = self.instance.read_u16(address + _BATTLE_MON_MAX_HP_OFFSET)
+            address = self._battle_mons_address + battler * self._battle_mon_size
+            live_hp = self.instance.read_u16(address + self._battle_mon_hp_offset)
+            live_max = self.instance.read_u16(address + self._battle_mon_max_hp_offset)
             if 0 < live_max <= 999 and 0 <= live_hp <= live_max:
                 hp[party_slot] = live_hp
                 max_hp[party_slot] = live_max
@@ -463,6 +600,24 @@ class StateReader:
     def _all_present_fainted(hp_values: list[int], max_hp_values: list[int]) -> bool:
         present = [hp for hp, max_hp in zip(hp_values, max_hp_values) if max_hp > 0]
         return bool(present) and all(hp <= 0 for hp in present)
+
+    def _detect_vanilla_emerald(self) -> bool:
+        if not hasattr(self.instance, "read_u32"):
+            return False
+        try:
+            from optimizer.gen3_save import EMERALD_SAVE_BLOCK_1_PTR, EWRAM_CHUNK, EWRAM_START
+
+            save_block = self.instance.read_u32(EMERALD_SAVE_BLOCK_1_PTR)
+            if not EWRAM_START <= save_block < EWRAM_START + EWRAM_CHUNK * 2:
+                return False
+            count = self.instance.read_u8(save_block + 0x234)
+            if not 0 <= count <= 6:
+                return False
+            save_personality = self.instance.read_u32(save_block + 0x238)
+            live_personality = self.instance.read_u32(_EMERALD_PLAYER_PARTY_BASE + 2)
+            return save_personality not in (0, 0xFFFFFFFF) and save_personality == live_personality
+        except Exception:
+            return False
 
 
 __all__ = ["BattleState", "MemoryMap", "StateReader"]

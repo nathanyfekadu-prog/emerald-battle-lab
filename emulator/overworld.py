@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import config
 from emulator.mgba_instance import MGBAInstance
+from optimizer.gen3_save import EMERALD_SAVE_BLOCK_1_PTR, EWRAM_CHUNK, EWRAM_START
 
 # button -> (dx, dy) in tile space (y grows downward).
 _DELTAS = {"UP": (0, -1), "DOWN": (0, 1), "LEFT": (-1, 0), "RIGHT": (1, 0)}
@@ -33,6 +34,13 @@ class OverworldMover:
         self.y_addr = y_addr
 
     def position(self) -> tuple[int, int]:
+        read_u32 = getattr(self.instance, "read_u32", None)
+        save_block = read_u32(EMERALD_SAVE_BLOCK_1_PTR) if read_u32 else 0
+        if EWRAM_START <= save_block < EWRAM_START + EWRAM_CHUNK * 2:
+            x = self.instance.read_u16(save_block)
+            y = self.instance.read_u16(save_block + 2)
+            if x < 1024 and y < 1024:
+                return x, y
         return self.instance.read_u16(self.x_addr), self.instance.read_u16(self.y_addr)
 
     def step(self, direction: str) -> bool:

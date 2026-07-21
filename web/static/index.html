@@ -3,7 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Pokemon Battle Solver</title>
+    <title>Emerald Battle Lab</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%232e6844'/%3E%3Ccircle cx='16' cy='16' r='7' fill='white'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="https://unpkg.com/reactflow@11/dist/style.css" />
     <style>
       :root {
@@ -720,6 +721,47 @@
       .sim-video-card video { width: 100%; aspect-ratio: 3 / 2; background: #000; image-rendering: pixelated; margin: 10px 0; }
       .sim-video-meta { display: flex; flex-wrap: wrap; gap: 8px 14px; color: #888; font-size: 10px; }
       .sim-video-error { color: #ff9b9b; font-size: 11px; margin-top: 8px; }
+      .evidence-library { display: grid; gap: 9px; margin-top: 12px; }
+      .evidence-day { border: 1px solid #333; background: #080808; }
+      .evidence-day-toggle {
+        width: 100%; display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 12px;
+        align-items: center; padding: 13px 14px; border: 0; background: transparent; color: white;
+        text-align: left; cursor: pointer;
+      }
+      .evidence-day-toggle:hover,.evidence-day.open .evidence-day-toggle { background: #111; }
+      .evidence-day-chevron { color: #9fd7ff; font-size: 16px; transform: rotate(-90deg); transition: transform .16s ease; }
+      .evidence-day.open .evidence-day-chevron { transform: rotate(0); }
+      .evidence-day-title strong,.evidence-day-title span { display: block; }
+      .evidence-day-title strong { font-size: 13px; }
+      .evidence-day-title span { color: #777; font-size: 10px; margin-top: 3px; }
+      .evidence-day-count { color: #9fd7ff; font-size: 10px; font-weight: 850; white-space: nowrap; }
+      .evidence-run-list { padding: 0 12px 12px; display: grid; gap: 7px; }
+      .evidence-run-row {
+        display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 14px; align-items: center;
+        border: 1px solid #2e2e2e; background: #050505; padding: 11px 12px;
+      }
+      .evidence-run-copy { min-width: 0; }
+      .evidence-run-copy strong { display: block; color: white; font-size: 12px; overflow-wrap: anywhere; }
+      .evidence-run-copy span { display: block; color: #777; font-size: 10px; margin-top: 4px; line-height: 1.4; }
+      .evidence-run-actions { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; justify-content: flex-end; }
+      .evidence-badge { border: 1px solid #3d5968; color: #bde4ff; background: #0b1115; padding: 5px 7px; font-size: 9px; font-weight: 900; letter-spacing: .04em; white-space: nowrap; }
+      .evidence-watch { border: 1px solid #9fd7ff; background: #9fd7ff; color: #071017; padding: 8px 10px; font: inherit; font-size: 11px; font-weight: 900; cursor: pointer; }
+      .evidence-watch:hover { background: white; border-color: white; }
+      .evidence-run-actions a { color: #bde4ff; font-size: 10px; font-weight: 800; text-decoration: none; padding: 7px 2px; white-space: nowrap; }
+      .evidence-run-actions a:hover { color: white; text-decoration: underline; }
+      .video-picker { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+      .video-picker button { border: 1px solid #476778; background: #0b1115; color: #bde4ff; padding: 9px 11px; font: inherit; font-size: 11px; font-weight: 800; cursor: pointer; }
+      .video-lightbox { position: fixed; inset: 0; z-index: 140; display: grid; place-items: center; padding: 24px; background: rgba(0,0,0,.88); backdrop-filter: blur(7px); }
+      .video-lightbox-dialog { width: min(980px,100%); max-height: calc(100vh - 48px); overflow: auto; border: 1px solid #647985; background: #080b0d; box-shadow: 0 30px 110px #000; }
+      .video-lightbox-head { display: flex; justify-content: space-between; gap: 18px; align-items: start; padding: 14px 16px; border-bottom: 1px solid #29343a; }
+      .video-lightbox-head strong,.video-lightbox-head span { display: block; }
+      .video-lightbox-head strong { color: white; font-size: 15px; }
+      .video-lightbox-head span { color: #80909a; font-size: 10px; margin-top: 4px; }
+      .video-lightbox-head button { border: 1px solid #3d4a51; background: transparent; color: white; padding: 7px 10px; cursor: pointer; }
+      .video-lightbox-player { width: 100%; max-height: calc(100vh - 155px); display: block; background: #000; image-rendering: pixelated; }
+      .video-lightbox-switcher { display: flex; gap: 7px; overflow-x: auto; padding: 10px 12px; border-top: 1px solid #29343a; }
+      .video-lightbox-switcher button { flex: 0 0 auto; border: 1px solid #3a454b; background: #10161a; color: #aebcc4; padding: 7px 9px; cursor: pointer; }
+      .video-lightbox-switcher button.active { border-color: #9fd7ff; color: white; }
       .gauntlet-view { height: 100%; overflow: auto; padding: 24px; background: #050505; }
       .local-input-strip {
         display: grid;
@@ -819,6 +861,135 @@
       .trainer-search-panel > label { display: block; color: #aaa; font-size: 11px; font-weight: 750; margin-bottom: 5px; }
       .trainer-search-panel > input { width: 100%; }
       .trainer-search-visible { max-height: 220px; margin-top: 7px; border: 1px solid #303030; background: #080808; }
+
+      .more-tools { position: relative; }
+      .more-tools summary {
+        list-style: none; cursor: pointer; border: 1px solid var(--border); border-radius: 6px;
+        padding: 8px 10px; color: var(--text); background: #0b0b0b; font-size: 13px;
+      }
+      .more-tools summary::-webkit-details-marker { display: none; }
+      .more-tools > div {
+        position: absolute; z-index: 80; top: calc(100% + 6px); left: 0; min-width: 190px;
+        padding: 6px; border: 1px solid var(--border); background: #101010; box-shadow: 0 12px 30px rgba(0,0,0,.45);
+      }
+      .more-tools > div button {
+        width: 100%; border: 0; padding: 9px 10px; background: transparent; color: var(--text);
+        text-align: left; cursor: pointer; font: inherit; font-size: 12px;
+      }
+      .more-tools > div button:hover { background: #1b1b1b; }
+
+      .sim-stage-progress { margin: 18px 0 22px; border: 1px solid #343434; background: #080808; padding: 16px; }
+      .sim-stage-head { display: flex; align-items: end; justify-content: space-between; gap: 16px; }
+      .sim-stage-head span,.sim-stage-head strong { display: block; }
+      .sim-stage-head span { color: #777; font-size: 10px; text-transform: uppercase; letter-spacing: .1em; }
+      .sim-stage-head strong { margin-top: 3px; font-size: 14px; }
+      .sim-stage-head > b { font-size: 24px; }
+      .sim-stage-main-track { height: 8px; margin: 11px 0 15px; overflow: hidden; background: #202020; }
+      .sim-stage-main-track > i { display: block; height: 100%; background: #9fd7ff; transition: width .25s ease; }
+      .sim-stage-list { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; }
+      .sim-stage-list > div { display: grid; grid-template-columns: 25px minmax(0,1fr); gap: 8px; align-items: start; color: #666; }
+      .sim-stage-list > div > span { display: grid; place-items: center; width: 23px; height: 23px; border: 1px solid #444; font-size: 10px; font-weight: 800; }
+      .sim-stage-list p { margin: 0; min-width: 0; }
+      .sim-stage-list strong,.sim-stage-list small { display: block; }
+      .sim-stage-list strong { font-size: 11px; }
+      .sim-stage-list small { margin-top: 3px; color: #666; font-size: 9px; line-height: 1.35; }
+      .sim-stage-list > div > i { grid-column: 1 / -1; height: 2px; overflow: hidden; background: #242424; }
+      .sim-stage-list > div > i b { display: block; height: 100%; background: #9fd7ff; transition: width .25s ease; }
+      .sim-stage-list > div.done,.sim-stage-list > div.current { color: white; }
+      .sim-stage-list > div.done > span,.sim-stage-list > div.current > span { border-color: #9fd7ff; }
+
+      /* Emerald is a quiet planning desk: cartridge green, paper panels, and one route-strip accent. */
+      .mode-emerald {
+        --bg: #edf2ec; --panel: #f8faf7; --node: #fff; --text: #18261e; --muted: #647168;
+        --green: #2e6844; --yellow: #796218; --red: #9a3535; --cyan: #2e6844; --border: #c9d4cb;
+        background: var(--bg); color: var(--text);
+      }
+      .mode-emerald .main,.mode-emerald .sim-view,.mode-emerald .flow-wrap { background: #edf2ec; color: #18261e; }
+      .mode-emerald .topbar { height: 64px; flex-basis: 64px; background: #f8faf7; border-color: #c9d4cb; padding-inline: 22px; }
+      .mode-emerald .product-mark strong { font-family: Georgia, "Times New Roman", serif; font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
+      .mode-emerald .product-mark span { color: #66746a; font-size: 8px; letter-spacing: .08em; }
+      .mode-emerald .tab,.mode-emerald .more-tools summary { border: 0; border-radius: 3px; background: transparent; color: #5b695f; }
+      .mode-emerald .tab:hover,.mode-emerald .more-tools summary:hover { background: #e4ebe3; color: #18261e; }
+      .mode-emerald .tab.active { color: #204f33; box-shadow: inset 0 -2px #2e6844; }
+      .mode-emerald .more-tools > div { border-color: #becbbf; border-radius: 4px; background: #fff; box-shadow: 0 12px 28px rgba(34,61,43,.14); }
+      .mode-emerald .more-tools > div button { color: #26372c; }
+      .mode-emerald .more-tools > div button:hover { background: #e8efe8; }
+      .mode-emerald .game-mode-switch { border-color: #c1cdc3; background: #eef3ed; }
+      .mode-emerald .game-mode-switch button { color: #627067; }
+      .mode-emerald .game-mode-switch button.active { background: #2e6844; color: white; }
+      .mode-emerald button.ghost { border-color: #b9c7bc; background: transparent; color: #294534; }
+      .mode-emerald button.primary { border-color: #2e6844; background: #2e6844; color: white; box-shadow: none; }
+      .mode-emerald .connection.ok { color: #2e6844; }
+      .mode-emerald .global-progress { top: 63px; }
+      .mode-emerald .global-progress-track { height: 3px; border: 0; background: #d9e2da; }
+      .mode-emerald .global-progress-fill { background: #2e6844; box-shadow: none; }
+      .mode-emerald .global-progress-label { top: 8px; border-color: #b9c8bc; border-radius: 3px; background: #f8faf7; color: #31553c; box-shadow: 0 7px 18px rgba(34,61,43,.1); }
+      .mode-emerald .sim-view { padding: 28px clamp(18px,4vw,54px) 60px; }
+      .mode-emerald .simulator-hero { margin: 0 auto 15px; max-width: 1180px; align-items: end; }
+      .mode-emerald .gauntlet-hero.simulator-hero { border: 1px solid #c9d4cb; border-radius: 5px; background: #f8faf7; }
+      .mode-emerald .simulator-hero h2 { margin: 6px 0 8px; max-width: 680px; color: #14231a; font-family: Georgia, "Times New Roman", serif; font-size: clamp(29px,4vw,48px); font-weight: 500; line-height: 1.02; letter-spacing: -.035em; }
+      .mode-emerald .simulator-hero p { max-width: 700px; color: #5d6b61; line-height: 1.55; }
+      .mode-emerald .sim-kicker { color: #2e6844; font-size: 9px; letter-spacing: .15em; }
+      .mode-emerald .gauntlet-summary,.mode-emerald .sim-fingerprint,.mode-emerald .sim-line-card,.mode-emerald .sim-video-card,.mode-emerald .evidence-day,.mode-emerald .sim-table,.mode-emerald .sim-stage-progress { border-color: #c9d4cb; border-radius: 5px; background: #f8faf7; color: #18261e; box-shadow: none; }
+      .mode-emerald .gauntlet-summary > div { border-color: #d3dcd5; background: #f8faf7; color: #647168; }
+      .mode-emerald .gauntlet-summary strong,.mode-emerald .sim-line-card-head strong,.mode-emerald .sim-line-record,.mode-emerald .sim-combatant strong,.mode-emerald .sim-header h2 { color: #18261e; }
+      .mode-emerald .sim-fingerprint.recognized { border-left-color: #2e6844; }
+      .mode-emerald .sim-fingerprint-title,.mode-emerald .sim-roster,.mode-emerald .sim-turn-detail { border-color: #d5ddd6; }
+      .mode-emerald .sim-signal,.mode-emerald .sim-count,.mode-emerald .sim-replay-details summary,.mode-emerald .sim-running-note { color: #2e6844 !important; }
+      .mode-emerald .sim-combatant em,.mode-emerald .sim-line-card ol { color: #4d5e53; }
+      .mode-emerald .sim-line-card.best { border-color: #2e6844; box-shadow: inset 0 3px #2e6844; }
+      .mode-emerald .sim-stage-main-track,.mode-emerald .sim-stage-list > div > i { background: #dce5dd; }
+      .mode-emerald .sim-stage-main-track > i,.mode-emerald .sim-stage-list > div > i b { background: #2e6844; }
+      .mode-emerald .sim-stage-list > div > span { border-color: #bdc9bf; }
+      .mode-emerald .sim-stage-list > div.done,.mode-emerald .sim-stage-list > div.current { color: #1e3827; }
+      .mode-emerald .sim-stage-list > div.done > span,.mode-emerald .sim-stage-list > div.current > span { border-color: #2e6844; }
+      .mode-emerald .sim-stage-list small,.mode-emerald .sim-ci,.mode-emerald .sim-muted,.mode-emerald .sim-subtitle,.mode-emerald .sim-read-status { color: #68756c; }
+      .mode-emerald .sim-table th { background: #e8eee8; color: #536158; }
+      .mode-emerald .sim-table td,.mode-emerald .sim-table th { border-color: #d2dbd4; }
+      .mode-emerald .sim-actions { color: #18261e; }
+      .mode-emerald .sim-status.WIN { background: #dce9de; color: #255238; }
+      .mode-emerald .gauntlet-view { background: #edf2ec; color: #18261e; }
+      .mode-emerald .gauntlet-view .gauntlet-hero { border-color: #c9d4cb; border-radius: 5px; background: #f8faf7; }
+      .mode-emerald .gauntlet-view .gauntlet-hero h2 { color: #14231a; font-family: Georgia, "Times New Roman", serif; font-weight: 500; letter-spacing: -.025em; }
+      .mode-emerald .gauntlet-view .gauntlet-hero p { color: #5d6b61; }
+      .mode-emerald .gauntlet-view .local-input-strip,.mode-emerald .gauntlet-view .task-progress-card,.mode-emerald .gauntlet-fight,.mode-emerald .gauntlet-hp-grid > div { border-color: #c9d4cb; background: #f8faf7; color: #18261e; }
+      .mode-emerald .gauntlet-view .local-input-strip label,.mode-emerald .gauntlet-view .task-progress-head,.mode-emerald .gauntlet-fight-head h3 { color: #1f4f32; }
+      .mode-emerald .gauntlet-view .local-input-strip small,.mode-emerald .gauntlet-mon-state { color: #647168; }
+      .mode-emerald .gauntlet-view .task-progress-track { background: #dce5dd; }
+      .mode-emerald .gauntlet-view .task-progress-fill { background: repeating-linear-gradient(90deg,#2e6844 0 22px,#86ad92 22px 25px); }
+      .mode-emerald .gauntlet-fight-head span { color: #2e6844; }
+      .mode-emerald .gauntlet-hp-grid b { color: #69766d; }
+      .mode-emerald .gauntlet-view .sim-video-error { color: #9a3535; }
+      .mode-emerald .gauntlet-view .sim-line-record { border-color: #c9d4cb; background: #f3f7f2; color: #294534; }
+      .mode-emerald .gauntlet-view button.ghost { border-color: #8fa392; color: #294534; }
+      .mode-emerald .evidence-day-toggle { color: #18261e; }
+      .mode-emerald .evidence-day-toggle:hover,.mode-emerald .evidence-day.open .evidence-day-toggle { background: #edf3ed; }
+      .mode-emerald .evidence-day-chevron,.mode-emerald .evidence-day-count { color: #2e6844; }
+      .mode-emerald .evidence-day-title span,.mode-emerald .evidence-run-copy span { color: #647168; }
+      .mode-emerald .evidence-run-row { border-color: #d5ddd6; background: #fff; }
+      .mode-emerald .evidence-run-copy strong { color: #18261e; }
+      .mode-emerald .evidence-badge { border-color: #aebdb1; background: #edf3ed; color: #294534; }
+      .mode-emerald .evidence-run-actions a { color: #2e6844; }
+      .mode-emerald .gauntlet-modal { border-color: #aebdb1; background: #f8faf7; color: #18261e; box-shadow: 0 28px 90px rgba(20,38,27,.28); }
+      .mode-emerald .gauntlet-modal-head h2,.mode-emerald .gauntlet-modal-head button { color: #18261e; }
+      .mode-emerald .gauntlet-modal-head p { color: #647168; }
+      .mode-emerald .gauntlet-mode button,.mode-emerald .gauntlet-search-results,.mode-emerald .gauntlet-queue,.mode-emerald .simulator-state-box,.mode-emerald .simulator-setting-grid label { border-color: #c9d4cb; background: #f3f7f2; color: #435248; }
+      .mode-emerald .gauntlet-mode button.active { border-color: #2e6844; color: #18261e; box-shadow: inset 0 -3px #2e6844; }
+      .mode-emerald .gauntlet-mode small,.mode-emerald .simulator-state-box label { color: #647168; }
+      .mode-emerald .gauntlet-search-row,.mode-emerald .gauntlet-queue-row { border-color: #d5ddd6; }
+      .mode-emerald .gauntlet-search-row button { border-color: #aebdb1; background: #fff; color: #294534; }
+      .mode-emerald .prep-diagnosis { border-color: #d1bd77; background: #fffaf0; color: #5b4d21; }
+      .mode-emerald .prep-diagnosis > strong { color: #5b4812; }
+      .mode-emerald .prep-diagnosis > p { color: #6b603e; }
+      .mode-emerald .trainer-dropdown-trigger,.mode-emerald .trainer-dropdown-popover,.mode-emerald .trainer-dropdown-options,.mode-emerald .trainer-dropdown-options button { border-color: #c5d0c7; background: #fff; color: #24352a; box-shadow: none; }
+      .mode-emerald .trainer-dropdown-options button:hover,.mode-emerald .trainer-dropdown-options button.active { background: #e8efe8; color: #18261e; box-shadow: inset 3px 0 #2e6844; }
+      .mode-emerald input,.mode-emerald select,.mode-emerald textarea { border-color: #bcc9bf; background: white; color: #18261e; }
+      .mode-emerald .empty { border: 1px dashed #c3cec5; border-radius: 5px; color: #69766d; background: rgba(255,255,255,.45); }
+      .mode-emerald .strategy-lab,.mode-emerald .calc-engine-view { background: #edf2ec; color: #18261e; }
+      .mode-emerald .strategy-lab-nav,.mode-emerald .calc-engine-toolbar { border-color: #c9d4cb; background: #f8faf7; color: #46564b; }
+      .mode-emerald .strategy-lab-nav button { border-color: #c9d4cb; background: transparent; color: #536158; }
+      .mode-emerald .strategy-lab-nav button.active { border-color: #2e6844; color: #204f33; box-shadow: inset 0 -2px #2e6844; }
+
       .plan-view { height: 100%; overflow: auto; padding: 20px; background: #000; }
       .plan-view h2 { margin: 0 0 14px; color: white; font-size: 18px; }
       .plan-card {
@@ -1230,6 +1401,138 @@
         text-align: left;
       }
       .rnb-matchup-table th { color: #bbb; background: #222; }
+      .game-mode-switch { display: inline-flex; align-items: center; padding: 3px; gap: 3px; border: 1px solid #35514a; border-radius: 999px; background: #07100e; }
+      .game-mode-switch button { border: 0; border-radius: 999px; padding: 7px 10px; background: transparent; color: #88a59d; font-size: 11px; font-weight: 900; letter-spacing: .03em; cursor: pointer; white-space: nowrap; }
+      .game-mode-switch button.active { background: #bdf7dc; color: #062017; box-shadow: 0 0 18px rgba(104,232,178,.18); }
+      .emerald-view { height: 100%; overflow: auto; padding: 22px; color: #edfdf6; background: radial-gradient(circle at 15% 0%,rgba(23,117,79,.18),transparent 35%),linear-gradient(180deg,#06100d 0,#030807 48%,#020403 100%); }
+      .emerald-shell { max-width: 1600px; margin: 0 auto; }
+      .emerald-hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; padding: 24px; border: 1px solid #245442; border-radius: 16px; background: linear-gradient(130deg,rgba(15,64,47,.82),rgba(5,18,14,.94)); box-shadow: 0 22px 60px rgba(0,0,0,.28); }
+      .emerald-kicker { color: #82e4ba; font-weight: 900; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; }
+      .emerald-hero h1 { margin: 7px 0 6px; font-size: clamp(27px,4vw,48px); letter-spacing: -.045em; }
+      .emerald-hero p { max-width: 760px; margin: 0; color: #a9c8bc; line-height: 1.55; }
+      .emerald-source { color: #bdf7dc; font-size: 12px; white-space: nowrap; }
+      .emerald-source a { color: inherit; }
+      .emerald-stats { display: grid; grid-template-columns: repeat(4,minmax(110px,1fr)); gap: 10px; margin: 14px 0; }
+      .emerald-stat { border: 1px solid #1e4638; border-radius: 12px; padding: 14px; background: #07110e; }
+      .emerald-stat strong { display: block; color: #eafff6; font-size: 22px; }
+      .emerald-stat span { color: #779a8c; font-size: 10px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+      .emerald-controls { display: grid; grid-template-columns: minmax(220px,2fr) minmax(160px,1fr) auto auto; gap: 10px; align-items: end; padding: 14px; border: 1px solid #1c3a30; border-radius: 12px; background: #050b09; }
+      .emerald-controls label { margin-top: 0; color: #8fb4a6; }
+      .emerald-controls input,.emerald-controls select { border-color: #244c3d; background: #020705; }
+      .emerald-filter { height: 38px; border: 1px solid #244c3d; border-radius: 7px; padding: 0 12px; background: #06110d; color: #9dc4b5; font-weight: 800; cursor: pointer; }
+      .emerald-filter.active { background: #bdf7dc; color: #052017; border-color: #bdf7dc; }
+      .emerald-workspace { display: grid; grid-template-columns: minmax(440px,1.15fr) minmax(300px,.72fr) minmax(340px,.9fr); min-height: 640px; gap: 12px; margin-top: 12px; }
+      .emerald-panel { min-width: 0; border: 1px solid #1c3a30; border-radius: 14px; overflow: hidden; background: rgba(4,12,9,.92); }
+      .emerald-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 54px; padding: 12px 14px; border-bottom: 1px solid #173429; }
+      .emerald-panel-head strong { font-size: 13px; }
+      .emerald-panel-head span { color: #719486; font-size: 11px; }
+      .hoenn-atlas { position: relative; height: 580px; overflow: hidden; background-color: #07130f; background-image: linear-gradient(rgba(113,192,157,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(113,192,157,.045) 1px,transparent 1px),radial-gradient(ellipse at 35% 44%,rgba(70,153,109,.18),transparent 44%),radial-gradient(ellipse at 81% 68%,rgba(36,116,140,.2),transparent 35%); background-size: 28px 28px,28px 28px,auto,auto; }
+      .hoenn-atlas::before { content:""; position:absolute; inset:11% 7% 12% 6%; border: 1px dashed rgba(127,213,174,.22); border-radius: 42% 46% 35% 48%; transform: rotate(-4deg); pointer-events:none; }
+      .map-pin { position: absolute; transform: translate(-50%,-50%); width: 16px; height: 16px; border: 2px solid #08120e; border-radius: 50%; background: #75d9ad; box-shadow: 0 0 0 1px #75d9ad,0 0 12px rgba(117,217,173,.4); cursor: pointer; z-index: 2; }
+      .map-pin.required { background: #ffd873; box-shadow: 0 0 0 1px #ffd873,0 0 14px rgba(255,216,115,.5); }
+      .map-pin.active { width: 25px; height: 25px; background: white; box-shadow: 0 0 0 3px rgba(189,247,220,.28),0 0 24px rgba(189,247,220,.8); z-index: 4; }
+      .map-pin-label { position: absolute; transform: translate(-50%,12px); max-width: 95px; padding: 2px 4px; border-radius: 4px; background: rgba(1,7,4,.78); color: #a8cabc; font-size: 8px; font-weight: 800; line-height: 1.15; text-align: center; pointer-events: none; white-space: normal; z-index: 1; }
+      .map-pin-label.active { color: white; z-index: 5; }
+      .trainer-map-pin { position:absolute; transform:translate(-50%,-50%); width:10px; height:10px; padding:0; border:1px solid #07130f; border-radius:2px; background:#d8fff0; box-shadow:0 0 0 1px rgba(117,217,173,.75); cursor:pointer; z-index:6; }
+      .trainer-map-pin.required { background:#ffd873; box-shadow:0 0 0 1px rgba(255,216,115,.9); }
+      .trainer-map-pin.active { width:15px; height:15px; background:white; outline:2px solid #75d9ad; z-index:8; }
+      .hint-setup-card { border:1px solid #315b4a; background:#0b1813; padding:12px; display:grid; gap:10px; }
+      .hint-setup-head { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+      .hint-setup-head div { display:grid; gap:3px; }
+      .hint-setup-head span { color:#8eaa9f; font-size:11px; }
+      .hint-setup-head button { min-width:58px; border:1px solid #4c7564; background:#111; color:#a9c7bb; padding:7px 10px; }
+      .hint-setup-head button.active { background:#bdf7dc; color:#07110d; font-weight:900; }
+      .hint-result { border:1px solid #315b4a; background:#091510; padding:14px; display:grid; gap:10px; margin-top:12px; }
+      .hint-step { border-left:3px solid #75d9ad; padding:8px 10px; background:#0d1d17; }
+      .hint-step strong { display:block; margin-bottom:4px; color:#d9fff0; }
+      .hint-level-warning { border:1px solid #8c6b20; background:#211a08; color:#ffe39a; padding:10px; }
+      .prep-diagnosis { margin:12px 0; padding:14px; border:1px solid #76601e; border-radius:8px; background:#171509; color:#f6e9bd; }
+      .prep-diagnosis > strong { display:block; color:#fff3b8; margin-bottom:5px; }
+      .prep-diagnosis > p { margin:0 0 10px; color:#d8cda7; }
+      .prep-blocker { margin-top:8px; padding:9px 10px; border-left:3px solid #d3aa3d; background:#211d0d; }
+      .prep-blocker b,.prep-blocker span,.prep-blocker small { display:block; }
+      .prep-blocker span { margin-top:3px; color:#e4dac0; }
+      .prep-blocker small { margin-top:4px; color:#c6b66e; }
+      .prep-steps { margin:10px 0 0; padding-left:22px; }
+      .prep-steps li { margin:5px 0; }
+      .atlas-mode-switch { display:flex; gap:5px; }
+      .atlas-mode-switch button { border:1px solid #315b4a; background:#07100c; color:#93b6a7; padding:5px 8px; font-size:10px; }
+      .atlas-mode-switch button.active { background:#bdf7dc; color:#06110c; font-weight:900; }
+      .exact-map-shell { height:580px; display:grid; grid-template-rows:auto 1fr; min-width:0; background:#020604; }
+      .exact-map-toolbar { display:flex; gap:10px; align-items:center; padding:10px; border-bottom:1px solid #1e3b30; }
+      .exact-map-toolbar select { flex:1; background:#07110d; color:#d8fff0; border:1px solid #315b4a; padding:8px; }
+      .exact-map-zoom { display:flex; gap:4px; }
+      .exact-map-zoom button { min-width:36px; border:1px solid #315b4a; background:#07100c; color:#9bc4b2; padding:7px; font-size:10px; font-weight:900; cursor:pointer; }
+      .exact-map-zoom button.active { background:#bdf7dc; color:#06110c; }
+      .exact-map-viewport { overflow:auto; min-width:0; min-height:0; padding:12px; background:#010302; }
+      .exact-map-grid { position:relative; width:100%; border:1px solid #315b4a; background:#07130f; box-shadow:0 12px 30px rgba(0,0,0,.45); transform-origin:top left; }
+      .exact-map-image { display:block; width:100%; height:100%; object-fit:fill; image-rendering:pixelated; user-select:none; }
+      .exact-trainer-pin { position:absolute; transform:translate(-50%,-74%); padding:0; border:0; background:transparent; cursor:pointer; z-index:6; overflow:visible; }
+      .exact-trainer-pin::before { content:""; position:absolute; inset:-5px; border:1px solid rgba(233,178,47,.65); border-radius:50%; background:rgba(20,13,2,.34); box-shadow:0 0 10px rgba(255,216,115,.56); transition:inset .12s,background .12s,box-shadow .12s; }
+      .exact-trainer-pin img { position:relative; display:block; width:100%; height:100%; object-fit:contain; image-rendering:pixelated; filter:drop-shadow(0 2px 1px rgba(0,0,0,.75)); }
+      .exact-trainer-pin.required::before { border-color:#ffdc68; background:rgba(92,57,3,.34); box-shadow:0 0 13px rgba(255,216,115,.8); }
+      .exact-trainer-pin.active { z-index:8; }
+      .exact-trainer-pin.active::before { inset:-8px; border:2px solid #8dffca; background:rgba(7,41,27,.52); box-shadow:0 0 18px rgba(117,217,173,1); }
+      .exact-map-caption { position:sticky; left:8px; bottom:8px; display:inline-block; margin-top:-32px; padding:5px 7px; border:1px solid rgba(255,255,255,.18); border-radius:5px; background:rgba(3,10,7,.86); color:#c7e8db; font-size:9px; pointer-events:none; backdrop-filter:blur(4px); }
+      .emerald-list { height: 580px; overflow: auto; }
+      .emerald-trainer-row { width: 100%; display: block; padding: 12px 13px; border: 0; border-bottom: 1px solid #12271f; background: transparent; color: #dff7ed; text-align: left; cursor: pointer; }
+      .emerald-trainer-row:hover,.emerald-trainer-row.active { background: #0b2119; }
+      .emerald-trainer-row.required .emerald-trainer-name { font-weight: 950; color: #ffe39a; }
+      .emerald-trainer-name { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; }
+      .emerald-trainer-meta { margin-top: 5px; color: #6f9485; font-size: 10px; }
+      .emerald-badge { flex: 0 0 auto; border: 1px solid #315b49; border-radius: 99px; padding: 2px 5px; color: #91c9b2; font-size: 8px; letter-spacing: .06em; }
+      .emerald-detail { height: 580px; overflow: auto; padding: 15px; }
+      .emerald-detail h2 { margin: 3px 0 4px; color: #f5fff9; font-size: 23px; }
+      .emerald-detail-route { color: #8bb7a5; font-size: 12px; }
+      .emerald-required-note { margin: 12px 0; padding: 9px 10px; border: 1px solid #796322; border-radius: 8px; background: #211b08; color: #ffe39a; font-size: 11px; font-weight: 800; }
+      .emerald-party { display: grid; gap: 9px; margin-top: 14px; }
+      .emerald-mon { border: 1px solid #23483a; border-radius: 10px; padding: 11px; background: #07130f; }
+      .emerald-mon-head { display: flex; justify-content: space-between; gap: 10px; }
+      .emerald-mon-head strong { color: #eafff5; }
+      .emerald-mon-head span { color: #7ddbae; font-size: 11px; font-weight: 900; }
+      .emerald-moves { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin: 9px 0; }
+      .emerald-move { padding: 5px 7px; border-radius: 5px; background: #0e251c; color: #b8d8cb; font-size: 10px; }
+      .emerald-mon-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 4px; color: #648878; font-size: 9px; }
+      .emerald-mon-stats b { color: #a9cabe; }
+      .emerald-empty { padding: 28px; color: #789a8d; text-align: center; }
+      .boss-checkpoint-rail { margin-top:12px; border:1px solid #3b5f4e; border-radius:14px; background:linear-gradient(135deg,#07140f,#0e281e 62%,#1b3217); overflow:hidden; box-shadow:inset 0 1px rgba(255,255,255,.05),0 18px 38px rgba(0,0,0,.24); }
+      .boss-rail-head { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:13px 15px; border-bottom:1px solid #284939; }
+      .boss-rail-head div { display:grid; gap:3px; }
+      .boss-rail-head span { color:#ffd873; font:900 9px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.16em; }
+      .boss-rail-head strong { color:#f0fff8; font-size:15px; }
+      .boss-rail-head button,.elite-four-preset { border:1px solid #76cfa8; background:#bdf7dc; color:#062016; font-weight:900; cursor:pointer; }
+      .boss-rail-head button { border-radius:7px; padding:8px 11px; }
+      .boss-rail-scroll { display:flex; gap:8px; padding:11px; overflow-x:auto; scrollbar-color:#396452 transparent; }
+      .boss-rail-scroll > button { flex:0 0 185px; display:grid; grid-template-columns:38px 1fr; gap:9px; align-items:center; padding:9px; border:1px solid #315846; border-radius:8px; background:#081711; color:#eafff5; text-align:left; cursor:pointer; }
+      .boss-rail-scroll > button.active { border-color:#ffd873; box-shadow:0 0 0 2px rgba(255,216,115,.16); background:#1d210d; }
+      .boss-rail-scroll img { width:32px; height:44px; object-fit:contain; image-rendering:pixelated; }
+      .boss-rail-scroll span { display:grid; gap:4px; min-width:0; }
+      .boss-rail-scroll strong { font-size:11px; }
+      .boss-rail-scroll small { color:#8eb7a5; font-size:9px; }
+      .emerald-trainer-row { display:flex; align-items:center; gap:10px; }
+      .emerald-trainer-row > span { flex:1; min-width:0; }
+      .trainer-list-sprite { flex:0 0 24px; width:24px; height:38px; object-fit:contain; image-rendering:pixelated; }
+      .emerald-badge.boss { border-color:#80671d; color:#ffe088; background:#241d08; }
+      .checkpoint-count-chip { border:1px solid #49715f; border-radius:999px; padding:6px 10px; color:#bdf7dc; background:#08150f; font:800 10px ui-monospace,SFMono-Regular,Menlo,monospace; white-space:nowrap; }
+      .battle-planner-only .calc-engine-body { display:block; min-height:0; }
+      .battle-planner-only .line-finder-drawer { position:static; width:100%; max-width:none; min-height:0; height:auto; border-left:0; transform:none; box-shadow:none; }
+      .battle-planner-only .line-finder-body { max-width:1180px; width:100%; margin:0 auto; }
+      .elite-four-preset { width:100%; display:grid; gap:4px; padding:14px 16px; margin-bottom:12px; border-radius:10px; text-align:left; }
+      .elite-four-preset span { font:900 9px ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.14em; opacity:.7; }
+      .elite-four-preset strong { font-size:15px; }
+      .elite-four-preset small { font-weight:700; opacity:.72; }
+      .ruleset-grid { display:grid; grid-template-columns:1.25fr 1.25fr repeat(3,minmax(110px,.7fr)); gap:8px; margin:0 0 12px; }
+      .ruleset-grid label { margin:0; padding:10px; border:1px solid #344e42; background:#0a120e; color:#bcd4ca; }
+      .ruleset-grid select { width:100%; margin-top:6px; }
+      .ruleset-grid > button { border:1px solid #344e42; background:#0a120e; color:#a9c2b7; padding:10px; font-weight:800; cursor:pointer; }
+      .ruleset-grid > button.active { border-color:#8ee2bd; background:#173e2d; color:#dffff0; }
+      .gauntlet-mode.three { grid-template-columns:repeat(3,1fr); }
+      .gauntlet-rule-strip { display:flex; flex-wrap:wrap; gap:7px; align-items:center; margin:10px 0; padding:10px 12px; border:1px solid #315747; background:#09150f; color:#a9c7ba; font-size:10px; }
+      .gauntlet-rule-strip strong { color:#ffe08a; text-transform:uppercase; letter-spacing:.08em; }
+      .gauntlet-rule-strip span { border-left:1px solid #315747; padding-left:7px; text-transform:capitalize; }
+      .last-resort-disclosure { display:grid; gap:5px; margin-top:10px; padding:11px; border:1px solid #8d6720; background:#211a08; color:#ffe8aa; }
+      .last-resort-disclosure strong { font-size:10px; letter-spacing:.1em; }
+      .last-resort-disclosure small { color:#c7b577; }
       @keyframes fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
       @media (max-width: 860px) {
         #root, .app { height: auto; min-height: 100vh; }
@@ -1250,7 +1553,7 @@
         .sim-fingerprint-screen { grid-column: 1 / -1; justify-self: center; }
         .sim-line-grid { grid-template-columns: 1fr; }
         .sim-table { min-width: 780px; }
-        .gauntlet-summary,.gauntlet-hp-grid,.gauntlet-builder,.gauntlet-mode { grid-template-columns: 1fr; }
+        .gauntlet-summary,.gauntlet-hp-grid,.gauntlet-builder,.gauntlet-mode,.gauntlet-mode.three,.ruleset-grid { grid-template-columns: 1fr; }
         .local-input-strip { grid-template-columns: 1fr; }
         .topbar { height: auto; min-height: 56px; flex: 0 0 auto; display: block; padding-top: 8px; padding-bottom: 8px; }
         .product-mark { width: 100%; margin-bottom: 8px; }
@@ -1261,16 +1564,41 @@
         .simulator-setting-grid { grid-template-columns: 1fr; }
         .simulator-run-preview { grid-template-columns: 1fr 1fr; }
         .strategy-lab-nav { overflow-x: auto; }
+        .strategy-lab, .strategy-lab-body, .calc-engine-view, .calc-engine-body { min-width: 0; width: 100%; }
+        .line-finder-drawer {
+          position: fixed;
+          inset: 112px 8px 8px;
+          width: auto;
+          z-index: 40;
+        }
         .judge-proof-grid { grid-template-columns: 1fr 1fr; }
         .judge-demo-grid { grid-template-columns: 1fr; }
         .judge-battle { grid-template-columns: 1fr; }
         .judge-battle > b { display: none; }
         .judge-battle .enemy { text-align: left; }
         .simulator-modal .gauntlet-modal-actions { align-items: stretch; flex-direction: column; }
+        .evidence-run-row { grid-template-columns: 1fr; }
+        .evidence-run-actions { justify-content: flex-start; }
+        .video-lightbox { padding: 8px; }
+        .game-mode-switch { margin-top: 8px; }
+        .emerald-view { padding: 12px; }
+        .emerald-hero { align-items: flex-start; flex-direction: column; }
+        .emerald-stats { grid-template-columns: 1fr 1fr; }
+        .emerald-controls { grid-template-columns: 1fr 1fr; }
+        .emerald-controls > div:first-child { grid-column: 1 / -1; }
+        .emerald-workspace { grid-template-columns: 1fr; }
+        .hoenn-atlas,.emerald-list,.emerald-detail { height: 500px; }
+        .sim-stage-list { grid-template-columns: 1fr 1fr; }
+        .mode-emerald .topbar { height: auto; }
       }
     </style>
   </head>
   <body>
+    <script>
+      window.__TRAINER_CATALOG__ = __TRAINER_CATALOG_JSON__;
+      window.__EMERALD_DATA__ = __EMERALD_DATA_JSON__;
+      window.__LOCAL_TESTING_CONFIG__ = __LOCAL_TESTING_CONFIG_JSON__;
+    </script>
     <div id="root"></div>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -1294,11 +1622,25 @@
         try { return localStorage.getItem(`pokemon-battle-solver:${key}`) || ""; }
         catch (_error) { return ""; }
       };
-      const defaultRom = savedLocalPath("rom");
-      const defaultState = savedLocalPath("state");
-      const defaultPcState = savedLocalPath("pc-state");
-      const defaultBattleState = savedLocalPath("battle-state");
-      const requestedView = new URLSearchParams(location.search).get("view") || "gauntlet";
+      const savedLocalJson = (key, fallback) => {
+        try { return JSON.parse(localStorage.getItem(`pokemon-battle-solver:${key}`)) || fallback; }
+        catch (_error) { return fallback; }
+      };
+      const localTestingConfig = window.__LOCAL_TESTING_CONFIG__ || {};
+      // A validated private server default beats a stale browser value. This keeps one
+      // mistyped path from disabling autofill forever; manual edits still work for the
+      // current session and machines without .env.local continue to use browser storage.
+      const defaultRom = localTestingConfig.rom || savedLocalPath("rom") || "";
+      const defaultState = localTestingConfig.state || savedLocalPath("state") || "";
+      const defaultPcState = localTestingConfig.pc_state || savedLocalPath("pc-state") || "";
+      const defaultBattleState = localTestingConfig.battle_state || savedLocalPath("battle-state") || "";
+      const emeraldDefaultRom = localTestingConfig.emerald_rom || savedLocalPath("emerald-rom") || "";
+      const emeraldDefaultState = localTestingConfig.emerald_state || savedLocalPath("emerald-state") || "";
+      const emeraldDefaultPcState = localTestingConfig.emerald_pc_state || savedLocalPath("emerald-pc-state") || emeraldDefaultState;
+      const emeraldDefaultBattleState = localTestingConfig.emerald_battle_state || savedLocalPath("emerald-battle-state") || emeraldDefaultState;
+      const requestedGameMode = new URLSearchParams(location.search).get("mode");
+      const initialGameMode = requestedGameMode === "run-and-bun" ? "run-and-bun" : "emerald";
+      const requestedView = new URLSearchParams(location.search).get("view") || (initialGameMode === "emerald" ? "simulators" : "gauntlet");
       const requestedStrategyView = ["calc", "flowchart", "coach"].includes(requestedView) ? requestedView : "calc";
       const initialCanvasView = ["calc", "flowchart", "coach"].includes(requestedView) ? "strategy" : requestedView;
 
@@ -1352,6 +1694,7 @@
       }
 
       function App() {
+        const [gameMode, setGameMode] = useState(initialGameMode);
         const [canvasTab, setCanvasTab] = useState(initialCanvasView);
         const [strategyTab, setStrategyTab] = useState(requestedStrategyView);
         const [connected, setConnected] = useState(false);
@@ -1370,7 +1713,7 @@
         const [simulatorInspectStatus, setSimulatorInspectStatus] = useState("idle");
         const [validatedLines, setValidatedLines] = useState([]);
         const [simRunLogs, setSimRunLogs] = useState([]);
-        const [calcTrainers, setCalcTrainers] = useState([]);
+        const [calcTrainers, setCalcTrainers] = useState(() => window.__TRAINER_CATALOG__ || []);
         const [calcSample, setCalcSample] = useState("");
         const [calcForm, setCalcForm] = useState({
           trainer_id: 0, imports: "", max_turns: 30, crit_safe: true,
@@ -1378,15 +1721,19 @@
           custom_mode: false, custom_trainer_name: "Custom Doubles",
           custom_enemy_imports: "", custom_is_double: true,
           player_leads: [], enemy_leads: [0, 1],
+          hint_mode: false, level_cap: 15,
+          ruleset: "hardcore-nuzlocke", items_in_battle: false,
         });
         const [calcResult, setCalcResult] = useState(null);
         const [calcStatus, setCalcStatus] = useState("idle");
         const [calcProgress, setCalcProgress] = useState(null);
         const [showGauntletSetup, setShowGauntletSetup] = useState(false);
-        const [gauntletForm, setGauntletForm] = useState({
-          trainer_ids: [], back_to_back: true, route_mode: "next",
+        const [gauntletForm, setGauntletForm] = useState(() => savedLocalJson("gauntlet-route", {
+          trainer_ids: [], back_to_back: false, healing_mode: "bag", route_mode: "next",
           start_trainer_id: null, next_count: 4, end_trainer_id: null,
-        });
+          ruleset: "hardcore-nuzlocke", items_in_battle: false, allow_revives: false,
+          hint_mode: false, leveling_policy: "party-max", max_total_faints: 3, required_path: false,
+        }));
         const [gauntletResult, setGauntletResult] = useState(null);
         const [gauntletStatus, setGauntletStatus] = useState("ready");
         const [gauntletProgress, setGauntletProgress] = useState(null);
@@ -1406,32 +1753,52 @@
         const [form, setForm] = useState({
           rom: defaultRom,
           state: defaultState,
+          result_state: "",
           battle_state: defaultBattleState,
           pc_state: defaultPcState,
           instances: 4,
           turns: 20,
-          iterations: 60,
+          iterations: 24,
           trials_per_node: 2,
-          final_line_trials: 256,
-          final_line_candidates: 6,
+          final_line_trials: 12,
+          final_line_candidates: 3,
           nuzlocke: true,
         });
         const canvasTabRef = useRef(canvasTab);
 
         useEffect(() => {
           try {
+            const prefix = gameMode === "emerald" ? "emerald-" : "";
             const localPaths = {
-              rom: form.rom,
-              state: form.state,
-              "pc-state": form.pc_state,
-              "battle-state": form.battle_state,
+              [`${prefix}rom`]: form.rom,
+              [`${prefix}state`]: form.state,
+              [`${prefix}pc-state`]: form.pc_state,
+              [`${prefix}battle-state`]: form.battle_state,
             };
             Object.entries(localPaths).forEach(([key, value]) => {
               if (value) localStorage.setItem(`pokemon-battle-solver:${key}`, value);
               else localStorage.removeItem(`pokemon-battle-solver:${key}`);
             });
           } catch (_error) {}
-        }, [form.rom, form.state, form.pc_state, form.battle_state]);
+        }, [gameMode, form.rom, form.state, form.pc_state, form.battle_state]);
+
+        useEffect(() => {
+          if (gameMode === "emerald") {
+            setForm((current) => ({ ...current, rom: emeraldDefaultRom, state: emeraldDefaultState, result_state: "", battle_state: emeraldDefaultBattleState, pc_state: emeraldDefaultPcState }));
+            fetch("/api/games/emerald/league-proof", { cache:"no-store" }).then((response) => response.ok ? response.json() : null).then((proof) => {
+              if (!proof) return;
+              setGauntletResult((current) => current || proof);
+              setGauntletStatus(proof.result === "route-complete" ? "saved League validation loaded" : (proof.stopped_reason || "saved League validation stopped"));
+            }).catch(() => {});
+          } else {
+            setForm((current) => ({ ...current, rom: defaultRom, state: defaultState, result_state: "", battle_state: defaultBattleState, pc_state: defaultPcState }));
+          }
+        }, [gameMode]);
+
+        useEffect(() => {
+          try { localStorage.setItem("pokemon-battle-solver:gauntlet-route", JSON.stringify(gauntletForm)); }
+          catch (_error) {}
+        }, [gauntletForm]);
 
         useEffect(() => {
           fetch("/demo/judge-demo.json", { cache: "no-store" })
@@ -1452,12 +1819,20 @@
           };
           connect();
           restoreLastResult();
-          loadCalcTrainers();
           loadSavedCalcRuns();
           loadSavedGauntletRuns();
           loadSimulatorRuns();
           return () => { clearTimeout(timer); if (ws) ws.close(); };
         }, []);
+
+        useEffect(() => {
+          // Every trainer-driven surface shares this catalog. Reloading here makes
+          // Matchup, Flowchart, Coach, Simulator and Gauntlet change together.
+          loadCalcTrainers(gameMode);
+          setCalcResult(null);
+          setGauntletResult(null);
+          setCoachData(null);
+        }, [gameMode]);
 
         useEffect(() => { canvasTabRef.current = canvasTab; }, [canvasTab]);
 
@@ -1468,26 +1843,38 @@
           runCalcSim();
         }, [calcTrainers.length, calcForm.imports, calcResult, calcStatus]);
 
-        async function loadCalcTrainers() {
+        async function loadCalcTrainers(mode = gameMode) {
           let lastError = null;
           for (let attempt = 0; attempt < 5; attempt += 1) {
             try {
-              const response = await fetch("/api/calc/trainers", { cache: "no-store" });
+              const apiMode = mode === "emerald" ? "pokemon-emerald" : "run-and-bun";
+              const response = await fetch(`/api/calc/trainers?game_mode=${encodeURIComponent(apiMode)}`, { cache: "no-store" });
               if (!response.ok) throw new Error(`Trainer database returned ${response.status}`);
               const data = await response.json();
               if (!(data.trainers || []).length) throw new Error("Trainer database returned no trainers");
             setCalcTrainers(data.trainers || []);
             setCalcSample(data.sample_import || "");
+            const defaultTrainer = mode === "emerald"
+              ? ((data.trainers || []).find((trainer) => trainer.recommended_test) || data.trainers?.[0])
+              : data.trainers?.[0];
             setCalcForm((current) => ({
               ...current,
-              trainer_id: (data.trainers && data.trainers[0]?.id) || 0,
-              imports: current.imports || data.sample_import || "",
+              trainer_id: defaultTrainer?.id || 0,
+              imports: mode === "emerald"
+                ? (defaultTrainer?.checkpoint_roster_import || defaultTrainer?.checkpoint_team_import || current.imports || "")
+                : (data.sample_import || current.imports || ""),
             }));
             setGauntletForm((current) => {
               if (current.trainer_ids.length) return current;
               const trainers = data.trainers || [];
-              const corgiIndex = trainers.findIndex((trainer) => /breeder\s+corgi/i.test(trainer.trainer_name || trainer.label || ""));
-              const start = corgiIndex >= 0 ? corgiIndex : 0;
+              if (mode === "emerald") {
+                const leagueNames = ["Elite Four Sidney", "Elite Four Phoebe", "Elite Four Glacia", "Elite Four Drake", "Champion Wallace"];
+                const league = leagueNames.map((name) => trainers.find((trainer) => trainer.trainer_name === name)).filter(Boolean);
+                if (league.length === 5) return { ...current, trainer_ids:league.map((trainer) => trainer.id), start_trainer_id:league[0].id, end_trainer_id:league[4].id, next_count:4, route_mode:"until", back_to_back:false, healing_mode:"bag", ruleset:"hardcore-nuzlocke", items_in_battle:false, allow_revives:false, hint_mode:false };
+              }
+              const corgiIndex = mode === "run-and-bun" ? trainers.findIndex((trainer) => /breeder\s+corgi/i.test(trainer.trainer_name || trainer.label || "")) : -1;
+              const requiredIndex = trainers.findIndex((trainer) => trainer.required);
+              const start = corgiIndex >= 0 ? corgiIndex : (requiredIndex >= 0 ? requiredIndex : 0);
               const route = trainers.slice(start, start + 5);
               return {
                 ...current,
@@ -1588,6 +1975,10 @@
           if (msg.type === "video_recording") setMessage(msg.message || "Recording recommended line…");
           if (msg.type === "sim_run_log") {
             setSimRunLogs((items) => [msg.data, ...items.filter((item) => item.id !== msg.data?.id)].slice(0, 100));
+            if (msg.data?.proof_complete && msg.data?.output_state) {
+              setForm((current) => ({ ...current, result_state: msg.data.output_state }));
+              setMessage("Cartridge proof complete. Test again still uses the original battle save; continue from the victory checkpoint only when you choose to.");
+            }
           }
           if (msg.type === "weakness_report") setWeakness(msg.data);
           if (msg.type === "box_candidate") {
@@ -1801,7 +2192,7 @@
           setTimeout(fitTree, 0);
         }
 
-        async function submitSolve() {
+        async function submitSolve(stateOverride = "") {
           resetGraph();
           setMessage("Starting solve...");
           const response = await fetch("/api/solve", {
@@ -1809,7 +2200,7 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               rom: form.rom,
-              state: form.state,
+              state: stateOverride || form.state,
               instances: Number(form.instances),
               turns: Number(form.turns),
               iterations: Number(form.iterations),
@@ -1817,6 +2208,7 @@
               final_line_trials: Number(form.final_line_trials),
               final_line_candidates: Number(form.final_line_candidates),
               nuzlocke: form.nuzlocke,
+              game_mode: gameMode === "emerald" ? "pokemon-emerald" : "run-and-bun",
             }),
           });
           if (!response.ok) setMessage(await response.text());
@@ -1863,23 +2255,44 @@
           }
         }
 
+        async function ensureSimulatorCheckpoint(sourcePath, updateField = "state") {
+          if (!sourcePath || !/\.sav$/i.test(sourcePath)) return sourcePath;
+          setSimulatorInspectStatus("Opening the battery save and creating a battle checkpoint…");
+          const response = await fetch("/api/simulator/checkpoint", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              rom: form.rom,
+              source_state: sourcePath,
+              settle_frames: 120,
+              game_mode: gameMode === "emerald" ? "pokemon-emerald" : "run-and-bun",
+            }),
+          });
+          if (!response.ok) throw new Error(await response.text());
+          const data = await response.json();
+          setForm((current) => ({ ...current, [updateField]: data.state, result_state: "" }));
+          setSimulatorInspectStatus(`${data.player_name ? `Player ${data.player_name}. ` : ""}${data.note} Saved to ${data.state}`);
+          return data.state;
+        }
+
         async function inspectSimulatorState(stateOverride = null) {
           setSimulatorInspectStatus("reading save state");
-          const statePath = typeof stateOverride === "string" ? stateOverride : form.state;
           try {
+            const sourcePath = typeof stateOverride === "string" ? stateOverride : form.state;
+            const statePath = await ensureSimulatorCheckpoint(sourcePath, "state");
             const response = await fetch("/api/simulator/inspect", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ rom: form.rom, state: statePath }),
+              body: JSON.stringify({ rom: form.rom, state: statePath, game_mode: gameMode === "emerald" ? "pokemon-emerald" : "run-and-bun" }),
             });
             if (!response.ok) throw new Error(await response.text());
             const data = await response.json();
             setSimulatorSnapshot(data);
             setSimulatorInspectStatus(data.recognized ? "battle recognized" : "trainer not recognized");
-            return true;
+            return statePath;
           } catch (error) {
             setSimulatorInspectStatus(`Could not read battle: ${error}`);
-            return false;
+            return null;
           }
         }
 
@@ -1893,12 +2306,13 @@
                 rom: form.rom,
                 source_state: fromRomSave ? "" : form.state,
                 settle_frames: 120,
+                game_mode: gameMode === "emerald" ? "pokemon-emerald" : "run-and-bun",
               }),
             });
             if (!response.ok) throw new Error(await response.text());
             const data = await response.json();
-            setForm((current) => ({ ...current, state: data.state }));
-            setSimulatorInspectStatus(`${data.note} Saved to ${data.state}`);
+            setForm((current) => ({ ...current, state: data.state, result_state: "" }));
+            setSimulatorInspectStatus(`${data.player_name ? `Player ${data.player_name}. ` : ""}${data.note} Saved to ${data.state}`);
             if (data.battle_ready) await inspectSimulatorState(data.state);
           } catch (error) {
             setSimulatorInspectStatus(`Could not create checkpoint: ${error.message}`);
@@ -1906,7 +2320,8 @@
         }
 
         async function runSimulator() {
-          if (await inspectSimulatorState()) await submitSolve();
+          const checkpoint = await inspectSimulatorState();
+          if (checkpoint) await submitSolve(checkpoint);
         }
 
         async function killJob() {
@@ -1950,6 +2365,7 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               trainer_id: Number(calcForm.trainer_id),
+              game_mode: gameMode === "emerald" ? "pokemon-emerald" : "run-and-bun",
               imports: calcForm.imports,
               max_turns: Number(calcForm.max_turns || 30),
               crit_safe: Boolean(calcForm.crit_safe),
@@ -1961,6 +2377,10 @@
               custom_is_double: calcForm.custom_mode ? Boolean(calcForm.custom_is_double) : true,
               player_leads: (calcForm.player_leads || []).length >= 2 && (calcForm.player_leads || []).every(Number.isInteger) ? calcForm.player_leads : [],
               enemy_leads: calcForm.enemy_leads || [],
+              hint_mode: Boolean(calcForm.hint_mode),
+              level_cap: gameMode === "emerald" ? Number(calcForm.level_cap || 15) : null,
+              ruleset: calcForm.ruleset || "hardcore-nuzlocke",
+              items_in_battle: Boolean(calcForm.items_in_battle),
             }),
           });
           clearInterval(poll);
@@ -1995,19 +2415,34 @@
             } catch (_error) { /* retain the last trustworthy progress update */ }
           }, 350);
           try {
+            const sourceState = stateOverride || form.pc_state || form.state;
+            const canUseLocalState = Boolean(form.rom && sourceState);
+            const rosterState = canUseLocalState
+              ? await ensureSimulatorCheckpoint(sourceState, form.pc_state === sourceState ? "pc_state" : "state")
+              : "";
+            const firstTrainer = calcTrainers.find((trainer) => Number(trainer.id) === Number(routeIds[0]));
+            const embeddedRoster = firstTrainer?.checkpoint_roster_import || firstTrainer?.checkpoint_team_import || "";
             const response = await fetch("/api/calc/gauntlet", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 trainer_ids: routeIds,
-                imports: calcForm.imports,
+                game_mode: gameMode === "emerald" ? "pokemon-emerald" : "run-and-bun",
+                imports: embeddedRoster || calcForm.imports,
                 max_turns: Number(calcForm.max_turns || 30),
                 crit_safe: Boolean(calcForm.crit_safe),
                 heal_between: !backToBack,
-                optimize_between_fights: !backToBack,
+                healing_mode: gauntletForm.healing_mode || (backToBack ? "none" : "bag"),
+                optimize_between_fights: (gauntletForm.healing_mode || "bag") === "pokemon-center",
                 rom: form.rom,
-                pc_state: stateOverride || form.pc_state,
-                use_live_pc_box: true,
+                pc_state: rosterState,
+                use_live_pc_box: canUseLocalState,
+                ruleset: gauntletForm.ruleset || "hardcore-nuzlocke",
+                items_in_battle: Boolean(gauntletForm.items_in_battle),
+                allow_revives: Boolean(gauntletForm.allow_revives),
+                hint_mode: Boolean(gauntletForm.hint_mode),
+                leveling_policy: gauntletForm.leveling_policy || "party-max",
+                max_total_faints: Number(gauntletForm.max_total_faints ?? 3),
                 weather: calcForm.weather || null,
                 reflect: Boolean(calcForm.reflect),
                 light_screen: Boolean(calcForm.light_screen),
@@ -2016,20 +2451,23 @@
             if (!response.ok) throw new Error(await response.text());
             const data = await response.json();
             setGauntletResult(data);
-            setGauntletStatus(data.proof_complete ? "cartridge verified" : (data.proof_error || data.stopped_reason || "route proof incomplete"));
+            const plannerComplete = data.result === "route-complete";
+            setGauntletStatus(data.proof_complete ? "cartridge verified" : (plannerComplete ? "planner route complete; video and text evidence saved" : (data.proof_error || data.stopped_reason || "route stopped")));
             setGauntletProgress((current) => ({
               ...(current || {}), running: false,
-              pct: data.proof_complete ? 100 : 99,
-              phase: data.proof_complete ? "cartridge proof complete" : "game proof incomplete",
-              stage: data.proof_complete ? "verified" : "rejected",
+              pct: 100,
+              phase: data.proof_complete ? "cartridge proof complete" : (plannerComplete ? "planner route complete" : "route stopped"),
+              stage: data.proof_complete ? "verified" : (plannerComplete ? "planner-complete" : "stopped"),
               completed_replays: Number(data.emulator_validation?.fixed_replays || 0),
               total_replays: Number(data.emulator_validation?.fixed_replays || 2),
               video_ready: Boolean(data.proof_complete && (data.videos || []).some((video) => video.video_ready)),
             }));
             loadSavedGauntletRuns();
           } catch (error) {
-            setGauntletStatus(`Could not solve route: ${error.message}`);
-            setGauntletProgress((current) => ({ ...(current || {}), running: false, pct: 99, phase: "failed" }));
+            let detail = error.message || String(error);
+            try { detail = JSON.parse(detail).detail || detail; } catch (_parseError) {}
+            setGauntletStatus(`Could not start this route: ${detail}`);
+            setGauntletProgress((current) => ({ ...(current || {}), running: false, pct: 0, stage: "setup-error", phase: "Check the save and party, then try again" }));
           } finally {
             clearInterval(poll);
           }
@@ -2071,6 +2509,7 @@
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 trainer_id: Number(calcForm.trainer_id), imports: calcForm.imports,
+                game_mode: gameMode === "emerald" ? "pokemon-emerald" : "run-and-bun",
                 max_turns: Number(calcForm.max_turns || 30), crit_safe: Boolean(calcForm.crit_safe),
                 weather: calcForm.weather || null, reflect: Boolean(calcForm.reflect),
                 light_screen: Boolean(calcForm.light_screen),
@@ -2117,6 +2556,7 @@
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 trainer_id: Number(calcForm.trainer_id),
+                game_mode: gameMode === "emerald" ? "pokemon-emerald" : "run-and-bun",
                 imports: calcForm.imports,
                 crit_safe: Boolean(calcForm.crit_safe),
                 ...state,
@@ -2192,23 +2632,35 @@
           pct: calcProgress.pct || 0,
           label: `Line finder · ${calcProgress.phase || "calculating"}`,
         } : (["running", "solve", "recording", "prepare"].includes(status)) ? {
-          pct: progressPct,
-          label: `Simulator · ${message || progress.message || "testing routes"}`,
+          pct: Number(proofProgress?.pct || progressPct),
+          label: `Simulator · ${proofProgress?.phase || message || progress.message || "testing plans"}`,
         } : null;
 
         return (
-          <div className="app">
+          <div className={`app mode-${gameMode}`}>
             <main className="main">
               <div className="topbar">
-                <div className="product-mark"><strong>POKEMON BATTLE SOLVER</strong><span>Cartridge-verified search</span></div>
+                <div className="product-mark"><strong>{gameMode === "emerald" ? "Emerald Battle Atlas" : "Pokémon Battle Solver"}</strong><span>{gameMode === "emerald" ? "173 captured fights · no ROM required" : "Cartridge-verified Run & Bun"}</span></div>
                 <div className="canvas-tabs">
-                  <button className={`tab ${canvasTab === "demo" ? "active" : ""}`} onClick={() => setCanvasTab("demo")}>Judge Demo</button>
-                  <button className={`tab ${canvasTab === "strategy" ? "active" : ""}`} onClick={() => setCanvasTab("strategy")}>Strategy Lab</button>
-                  <button className={`tab ${canvasTab === "simulators" ? "active" : ""}`} onClick={() => setCanvasTab("simulators")}>Simulator</button>
-                  <button className={`tab ${canvasTab === "gauntlet" ? "active" : ""}`} onClick={() => { setCanvasTab("gauntlet"); setShowGauntletSetup(true); }}>Gauntlet</button>
-                  <button className={`tab ${canvasTab === "changelog" ? "active" : ""}`} onClick={() => setCanvasTab("changelog")}>Changelog</button>
+                    <button className={`tab ${canvasTab === "simulators" ? "active" : ""}`} onClick={() => setCanvasTab("simulators")}>Simulator</button>
+                    {gameMode === "emerald" && <button className={`tab ${canvasTab === "emerald" ? "active" : ""}`} onClick={() => setCanvasTab("emerald")}>Trainer map</button>}
+                    {gameMode === "run-and-bun" && <button className={`tab ${canvasTab === "demo" ? "active" : ""}`} onClick={() => setCanvasTab("demo")}>Judge Demo</button>}
+                    <button className={`tab ${canvasTab === "gauntlet" ? "active" : ""}`} onClick={() => { setCanvasTab("gauntlet"); setShowGauntletSetup(true); }}>Gauntlet</button>
+                    <details className="more-tools">
+                      <summary>More</summary>
+                      <div>
+                        <button onClick={() => { setCanvasTab("strategy"); setStrategyTab("calc"); }}>Battle planner</button>
+                        <button onClick={() => { setCanvasTab("strategy"); setStrategyTab("flowchart"); }}>Contingency map</button>
+                        <button onClick={() => { setCanvasTab("strategy"); setStrategyTab("coach"); }}>Turn coach</button>
+                        {gameMode !== "emerald" && <button onClick={() => setCanvasTab("changelog")}>Changelog</button>}
+                      </div>
+                    </details>
                 </div>
                 <div className="toolbar">
+                  <div className="game-mode-switch" role="group" aria-label="Game mode">
+                    <button className={gameMode === "emerald" ? "active" : ""} onClick={() => { setGameMode("emerald"); setCanvasTab("simulators"); setShowGauntletSetup(false); }}>Pokémon Emerald</button>
+                    <button className={gameMode === "run-and-bun" ? "active" : ""} onClick={() => { setGameMode("run-and-bun"); setCanvasTab("gauntlet"); }}>Run & Bun</button>
+                  </div>
                   <button className="ghost" onClick={() => setShowGbaLauncher((shown) => !shown)}>Open GBA</button>
                   <div className={`connection ${connected ? "ok" : "bad"}`}>{connected ? "Solver connected" : "Connecting to solver…"}</div>
                 </div>
@@ -2220,9 +2672,9 @@
               {showGbaLauncher && (
                 <div className="gba-launcher" role="dialog" aria-label="Open ROM in GBA">
                   <div className="gba-launcher-head"><span>Open ROM in mGBA</span><button onClick={() => setShowGbaLauncher(false)}>Close</button></div>
-                  <p>Choose the local Run & Bun ROM you want to test. This launches it in mGBA without starting a solver run.</p>
+                  <p>Choose the local {gameMode === "emerald" ? "Pokémon Emerald" : "Run & Bun"} ROM you want to test. This launches it in mGBA without starting a solver run.</p>
                   <label>ROM path</label>
-                  <input value={form.rom} onChange={(event) => setForm({ ...form, rom: event.target.value })} placeholder="/path/to/RunAndBun.gba" />
+                  <input value={form.rom} onChange={(event) => setForm({ ...form, rom: event.target.value })} placeholder={gameMode === "emerald" ? "/path/to/Pokemon Emerald.gba" : "/path/to/RunAndBun.gba"} />
                   <div className="gba-launcher-actions">
                     <button className="primary" onClick={openGba}>Open in mGBA</button>
                     <span className="node-meta">{message || "The file must exist on this Mac."}</span>
@@ -2231,16 +2683,30 @@
               )}
               {showGauntletSetup && (
                 <GauntletSetupModal
+                  gameMode={gameMode}
                   trainers={calcTrainers}
                   form={gauntletForm}
                   setForm={setGauntletForm}
                   onClose={() => setShowGauntletSetup(false)}
                   onRun={runGauntlet}
                   running={gauntletStatus === "solving the full route"}
+                  teamImports={calcForm.imports}
+                  setTeamImports={(imports) => setCalcForm((current) => ({ ...current, imports }))}
+                  localForm={form}
                 />
               )}
               <div className="flow-wrap">
-                {canvasTab === "tree" ? (
+                {gameMode === "emerald" && canvasTab === "emerald" ? (
+                  <EmeraldView data={window.__EMERALD_DATA__ || { trainers:[], locations:[], stats:{} }} onPlanTrainer={(trainerId) => {
+                    const emerald = window.__EMERALD_DATA__ || {};
+                    const trainer = (emerald.trainers || []).find((item) => Number(item.id) === Number(trainerId));
+                    const capture = (emerald.checkpoint_library?.entries || []).find((item) => Number(item.trainer_id) === Number(trainerId));
+                    const ace = Math.max(1, ...(trainer?.party || []).map((mon) => Number(mon.level || 1)));
+                    const nextCap = (emerald.level_caps || []).find((cap) => Number(cap.ace_level) >= ace)?.ace_level || 100;
+                    setCalcForm((current) => ({ ...current, trainer_id: Number(trainerId), custom_mode: false, level_cap: Number(nextCap), imports: capture?.roster_import || capture?.team_import || current.imports }));
+                    setCanvasTab("strategy"); setStrategyTab("calc");
+                  }} />
+                ) : canvasTab === "tree" ? (
                   <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} nodeTypes={nodeTypes} fitView minZoom={0.1} maxZoom={1.8} onInit={setFlow} onNodeClick={(_, node) => selectNodePath(node)}>
                     <Background color="#222" />
                     <Controls />
@@ -2252,12 +2718,13 @@
                   <div className="strategy-lab">
                     <nav className="strategy-lab-nav" aria-label="Strategy Lab tools">
                       <strong>STRATEGY LAB</strong>
-                      <button className={strategyTab === "calc" ? "active" : ""} onClick={() => setStrategyTab("calc")}>Matchup</button>
+                      <button className={strategyTab === "calc" ? "active" : ""} onClick={() => setStrategyTab("calc")}>Battle plan</button>
                       <button className={strategyTab === "flowchart" ? "active" : ""} onClick={() => setStrategyTab("flowchart")}>Contingencies</button>
                       <button className={strategyTab === "coach" ? "active" : ""} onClick={() => setStrategyTab("coach")}>Turn Coach</button>
                     </nav>
                     <div className="strategy-lab-body">
                       {strategyTab === "calc" ? <CalcView
+                        gameMode={gameMode}
                         trainers={calcTrainers}
                         form={calcForm}
                         setForm={setCalcForm}
@@ -2267,7 +2734,7 @@
                         runCalcSim={runCalcSim}
                         sample={calcSample}
                         onOpenFlowchart={() => setStrategyTab("flowchart")}
-                        savedRuns={savedCalcRuns}
+                        savedRuns={savedCalcRuns.filter((run) => (run.game_mode || "run-and-bun") === (gameMode === "emerald" ? "pokemon-emerald" : "run-and-bun"))}
                         onOpenSavedRun={openSavedCalcRun}
                         onDeleteSavedRun={deleteSavedCalcRun}
                         simulatorForm={form}
@@ -2294,7 +2761,23 @@
                 ) : canvasTab === "demo" ? (
                   <JudgeDemoView data={judgeDemo} onOpenEvidence={() => setCanvasTab("gauntlet")} onOpenStrategy={() => setCanvasTab("strategy")} />
                 ) : canvasTab === "simulators" ? (
-                  <SimulatorView
+                  gameMode === "emerald" ? <CalcView
+                    gameMode={gameMode}
+                    trainers={calcTrainers}
+                    form={calcForm}
+                    setForm={setCalcForm}
+                    result={calcResult}
+                    status={calcStatus}
+                    progress={calcProgress}
+                    runCalcSim={runCalcSim}
+                    sample={calcSample}
+                    onOpenFlowchart={() => { setCanvasTab("strategy"); setStrategyTab("flowchart"); }}
+                    savedRuns={savedCalcRuns.filter((run) => (run.game_mode || "run-and-bun") === "pokemon-emerald")}
+                    onOpenSavedRun={openSavedCalcRun}
+                    onDeleteSavedRun={deleteSavedCalcRun}
+                    simulatorForm={form}
+                  /> : <SimulatorView
+                    gameMode={gameMode}
                     trainers={calcTrainers}
                     events={simulatorEvents}
                     snapshot={simulatorSnapshot}
@@ -2309,10 +2792,11 @@
                     running={status === "running" || status === "solve" || status === "recording"}
                     progress={progress}
                     proofProgress={proofProgress}
-                    runLogs={simRunLogs}
+                    runLogs={simRunLogs.filter((run) => (run.game_mode || "run-and-bun") === (gameMode === "emerald" ? "pokemon-emerald" : "run-and-bun"))}
                   />
                 ) : canvasTab === "gauntlet" ? (
                   <GauntletView
+                    gameMode={gameMode}
                     trainers={calcTrainers}
                     form={gauntletForm}
                     result={gauntletResult}
@@ -2320,12 +2804,12 @@
                     progress={gauntletProgress}
                     onConfigure={() => setShowGauntletSetup(true)}
                     onRunProven={runProvenRoute}
-                    savedRuns={savedGauntletRuns}
+                    savedRuns={savedGauntletRuns.filter((run) => (run.game_mode || "run-and-bun") === (gameMode === "emerald" ? "pokemon-emerald" : "run-and-bun"))}
                     localForm={form}
                     setLocalForm={setForm}
                   />
                 ) : canvasTab === "changelog" ? (
-                  <ChangelogView />
+                  <ChangelogView gameMode={gameMode} />
                 ) : (
                   <div className="cards-view">
                     {complete?.team_plan && <TeamPlanSummary teamPlan={complete.team_plan} onApply={applyPreparedTeam} applyStatus={prepareApplyStatus} />}
@@ -2334,6 +2818,203 @@
                 )}
               </div>
             </main>
+          </div>
+        );
+      }
+
+      function EmeraldView({ data, onPlanTrainer }) {
+        const allTrainers = data.trainers || [];
+        const checkpointLibrary = data.checkpoint_library || { entries:[], stats:{} };
+        const checkpointEntries = checkpointLibrary.entries || [];
+        const checkpointByTrainer = useMemo(() => {
+          const grouped = new Map();
+          checkpointEntries.forEach((entry) => {
+            const id = Number(entry.trainer_id);
+            if (!grouped.has(id)) grouped.set(id, []);
+            grouped.get(id).push(entry);
+          });
+          return grouped;
+        }, [checkpointEntries]);
+        const trainers = useMemo(() => allTrainers.filter((trainer) => checkpointByTrainer.has(Number(trainer.id))).map((trainer) => {
+          const captures = checkpointByTrainer.get(Number(trainer.id)) || [];
+          return { ...trainer, captures, checkpoint_count:captures.length, tier:captures.some((entry) => entry.tier === "boss") ? "boss" : captures.some((entry) => entry.tier === "story") ? "story" : "trainer" };
+        }), [allTrainers, checkpointByTrainer]);
+        const locations = useMemo(() => (data.locations || []).map((item) => {
+          const ids = (item.trainer_ids || []).filter((id) => checkpointByTrainer.has(Number(id)));
+          return { ...item, trainer_ids:ids, required_count:ids.filter((id) => allTrainers.find((trainer) => Number(trainer.id) === Number(id))?.required).length };
+        }).filter((item) => item.trainer_ids.length), [data.locations, checkpointByTrainer, allTrainers]);
+        const stats = checkpointLibrary.stats || {};
+        const [query, setQuery] = useState("");
+        const [location, setLocation] = useState("");
+        const [requiredOnly, setRequiredOnly] = useState(false);
+        const [doublesOnly, setDoublesOnly] = useState(false);
+        const [bossOnly, setBossOnly] = useState(false);
+        const [selectedId, setSelectedId] = useState(trainers[0]?.id ?? null);
+        const [mapMode, setMapMode] = useState("hoenn");
+        const [exactMapId, setExactMapId] = useState("");
+        const [mapZoom, setMapZoom] = useState(1);
+        const exactMapViewportRef = useRef(null);
+
+        const filtered = useMemo(() => {
+          const needle = query.trim().toLowerCase();
+          return trainers.filter((trainer) => {
+            if (location && trainer.map_location !== location) return false;
+            if (requiredOnly && !trainer.required) return false;
+            if (doublesOnly && !trainer.is_double) return false;
+            if (bossOnly && trainer.tier !== "boss") return false;
+            if (!needle) return true;
+            const haystack = [
+              trainer.trainer_name, trainer.route, trainer.sublocation, trainer.map_location,
+              ...(trainer.party || []).flatMap((mon) => [mon.species, ...(mon.moves || [])]),
+            ].filter(Boolean).join(" ").toLowerCase();
+            return haystack.includes(needle);
+          });
+        }, [trainers, query, location, requiredOnly, doublesOnly, bossOnly]);
+        const bossTrainers = useMemo(() => trainers.filter((trainer) => trainer.tier === "boss"), [trainers]);
+
+        const selected = trainers.find((trainer) => trainer.id === selectedId) || filtered[0] || null;
+        const selectedLocation = location || selected?.map_location || "";
+        const mapLocation = locations.find((item) => item.name === selectedLocation) || null;
+        const trainerMarkers = mapLocation ? filtered.filter((trainer) => trainer.map_location === mapLocation.name) : [];
+        const exactMaps = useMemo(() => {
+          const grouped = new Map();
+          trainers.forEach((trainer) => {
+            const event = trainer.map_event;
+            if (!event) return;
+            if (!grouped.has(event.map_id)) grouped.set(event.map_id, { id:event.map_id, name:event.map_name, width:event.map_width, height:event.map_height, trainers:[] });
+            grouped.get(event.map_id).trainers.push(trainer);
+          });
+          return [...grouped.values()].sort((a,b) => a.name.localeCompare(b.name));
+        }, [trainers]);
+        const activeExactMapId = exactMapId || selected?.map_event?.map_id || exactMaps[0]?.id || "";
+        const activeExactMap = exactMaps.find((item) => item.id === activeExactMapId) || exactMaps[0] || null;
+        useEffect(() => {
+          if (mapMode !== "exact" || !selected?.map_event || !exactMapViewportRef.current) return;
+          const timer = setTimeout(() => {
+            const viewport = exactMapViewportRef.current;
+            const pin = viewport?.querySelector(`[data-trainer-id="${selected.id}"]`);
+            if (!viewport || !pin) return;
+            viewport.scrollLeft = Math.max(0, pin.offsetLeft - viewport.clientWidth / 2);
+            viewport.scrollTop = Math.max(0, pin.offsetTop - viewport.clientHeight / 2);
+          }, 0);
+          return () => clearTimeout(timer);
+        }, [mapMode, activeExactMapId, selected?.id, mapZoom]);
+        const setMapLocation = (name) => {
+          const next = location === name ? "" : name;
+          setLocation(next);
+          const first = trainers.find((trainer) => !next || trainer.map_location === next);
+          if (first) setSelectedId(first.id);
+        };
+        const selectTrainerOnMap = (trainer) => {
+          setSelectedId(trainer.id);
+          if (!trainer.map_event) return;
+          setMapMode("exact");
+          setExactMapId(trainer.map_event.map_id);
+          setMapZoom(1);
+        };
+
+        return (
+          <div className="emerald-view">
+            <div className="emerald-shell">
+              <section className="emerald-hero">
+                <div>
+                  <div className="emerald-kicker">JUDGE BUILD · ROM-FREE GEN III</div>
+                  <h1>The completed Emerald run, battle by battle.</h1>
+                  <p>Every playable fight below came from a real checkpoint in this finished save. Choose a trainer on the map, load the captured roster, and simulate it without downloading a GBA file.</p>
+                </div>
+                <div className="emerald-source">Sources: decoded user-owned checkpoints · <a href="https://docs.google.com/spreadsheets/d/1frqW2CeHop4o0NP6Ja_TAAPPkGIrvxkeQJBfyxFggyk/edit?gid=1064630895#gid=1064630895" target="_blank" rel="noreferrer">Emerald trainer sheet ↗</a> · <a href="https://github.com/pret/pokeemerald" target="_blank" rel="noreferrer">pret/pokeemerald maps ↗</a><br />No ROM or save-state binary is included in the judge build.</div>
+              </section>
+
+              <div className="emerald-stats">
+                <div className="emerald-stat"><strong>{stats.checkpoints || checkpointEntries.length}</strong><span>Captured checkpoints</span></div>
+                <div className="emerald-stat"><strong>{stats.unique_trainers || trainers.length}</strong><span>Playable battles</span></div>
+                <div className="emerald-stat"><strong>{stats.boss_checkpoints || bossTrainers.length}</strong><span>Boss checkpoints</span></div>
+                <div className="emerald-stat"><strong>{locations.length}</strong><span>Visited locations</span></div>
+              </div>
+
+              <section className="boss-checkpoint-rail" aria-label="Recommended difficult fights">
+                <div className="boss-rail-head"><div><span>RECOMMENDED FOR JUDGES</span><strong>Boss fights and story walls</strong></div><button onClick={() => setBossOnly((value) => !value)}>{bossOnly ? "Show every captured fight" : "Focus bosses"}</button></div>
+                <div className="boss-rail-scroll">{bossTrainers.map((trainer) => <button className={selected?.id === trainer.id ? "active" : ""} key={`boss-${trainer.id}`} onClick={() => selectTrainerOnMap(trainer)}>{trainer.map_event?.graphics_id && <img src={`/static/emerald-trainers/${trainer.map_event.graphics_id}.png`} alt="" />}<span><strong>{trainer.trainer_name}</strong><small>{trainer.map_location} · Lv. {Math.max(...trainer.party.map((mon) => Number(mon.level || 1)))}</small></span></button>)}</div>
+              </section>
+
+              <section className="emerald-controls" aria-label="Emerald trainer filters">
+                <div><label htmlFor="emerald-search">Search trainer, Pokémon, move, or route</label><input id="emerald-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Try Roxanne, Route 110, Swampert, or Rock Tomb" /></div>
+                <div><label htmlFor="emerald-location">Map location</label><select id="emerald-location" value={location} onChange={(event) => setMapLocation(event.target.value)}><option value="">All Hoenn locations</option>{locations.map((item) => <option value={item.name} key={item.name}>{item.name} · {item.trainer_ids.length}</option>)}</select></div>
+                <button className={`emerald-filter ${requiredOnly ? "active" : ""}`} onClick={() => setRequiredOnly((value) => !value)}>{requiredOnly ? "Required only ✓" : "Required only"}</button>
+                <button className={`emerald-filter ${doublesOnly ? "active" : ""}`} onClick={() => setDoublesOnly((value) => !value)}>{doublesOnly ? "Doubles only ✓" : "Doubles only"}</button>
+                <button className={`emerald-filter ${bossOnly ? "active" : ""}`} onClick={() => setBossOnly((value) => !value)}>{bossOnly ? "Boss fights ✓" : "Boss fights"}</button>
+              </section>
+
+              <div className="emerald-workspace">
+                <section className="emerald-panel">
+                  <div className="emerald-panel-head"><strong>{mapMode === "hoenn" ? "Hoenn route atlas" : "Exact trainer map"}</strong><div className="atlas-mode-switch"><button className={mapMode === "hoenn" ? "active" : ""} onClick={() => setMapMode("hoenn")}>Hoenn</button><button className={mapMode === "exact" ? "active" : ""} onClick={() => { setMapMode("exact"); if (selected?.map_event) setExactMapId(selected.map_event.map_id); }}>Map floor</button></div></div>
+                  {mapMode === "hoenn" ? <div className="hoenn-atlas" role="img" aria-label="Schematic Hoenn map with trainer location pins">
+                    {locations.map((item) => {
+                      const active = selectedLocation === item.name;
+                      return <React.Fragment key={item.name}>
+                        <button className={`map-pin ${item.required_count ? "required" : ""} ${active ? "active" : ""}`} style={{ left:`${item.x}%`, top:`${item.y}%` }} onClick={() => setMapLocation(item.name)} title={`${item.name}: ${item.trainer_ids.length} trainers${item.required_count ? `, ${item.required_count} required` : ""}`} aria-label={`${item.name}, ${item.trainer_ids.length} trainers`} />
+                        {active && <span className="map-pin-label active" style={{ left:`${item.x}%`, top:`${item.y}%` }}>{item.name}<br />{item.trainer_ids.length} fights</span>}
+                      </React.Fragment>;
+                    })}
+                    {trainerMarkers.map((trainer, index) => {
+                      const ring = 2.2 + Math.floor(index / 10) * 1.45;
+                      const angle = (index * 137.508) * Math.PI / 180;
+                      const x = Math.max(2, Math.min(98, mapLocation.x + Math.cos(angle) * ring));
+                      const y = Math.max(3, Math.min(97, mapLocation.y + Math.sin(angle) * ring * .72));
+                      return <button
+                        key={`trainer-pin-${trainer.id}`}
+                        className={`trainer-map-pin ${trainer.required ? "required" : ""} ${selected?.id === trainer.id ? "active" : ""}`}
+                        style={{ left:`${x}%`, top:`${y}%` }}
+                        onClick={() => selectTrainerOnMap(trainer)}
+                        title={`${trainer.trainer_name} · ${trainer.map_event ? `${trainer.map_event.map_name} tile ${trainer.map_event.x},${trainer.map_event.y}` : trainer.route}`}
+                        aria-label={`Select ${trainer.trainer_name}`}
+                      />;
+                    })}
+                  </div> : <div className="exact-map-shell">
+                    <div className="exact-map-toolbar"><select value={activeExactMap?.id || ""} onChange={(event) => { setExactMapId(event.target.value); setMapZoom(1); const map = exactMaps.find((item) => item.id === event.target.value); if (map?.trainers[0]) setSelectedId(map.trainers[0].id); }} aria-label="Choose an Emerald map floor">{exactMaps.map((map) => <option value={map.id} key={map.id}>{map.name} · {map.trainers.length} trainer{map.trainers.length === 1 ? "" : "s"}</option>)}</select><div className="exact-map-zoom" aria-label="Map zoom"><button className={mapZoom === 1 ? "active" : ""} onClick={() => setMapZoom(1)}>Fit</button><button className={mapZoom === 2 ? "active" : ""} onClick={() => setMapZoom(2)}>2×</button></div></div>
+                    {activeExactMap && <div className="exact-map-viewport" ref={exactMapViewportRef}><div className="exact-map-grid" style={{ width:`${mapZoom * 100}%`, aspectRatio:`${Math.max(1,activeExactMap.width)}/${Math.max(1,activeExactMap.height)}` }}>
+                      <img className="exact-map-image" src={`/static/emerald-maps/${activeExactMap.name}.png`} alt={`${activeExactMap.name} rendered Pokémon Emerald map`} draggable="false" />
+                      {activeExactMap.trainers.map((trainer) => <button data-trainer-id={trainer.id} key={`exact-${trainer.id}`} className={`exact-trainer-pin ${trainer.required ? "required" : ""} ${selected?.id === trainer.id ? "active" : ""}`} style={{ left:`${Math.max(1,Math.min(99,(trainer.map_event.x + .5) / Math.max(1,activeExactMap.width) * 100))}%`, top:`${Math.max(1,Math.min(99,(trainer.map_event.y + .5) / Math.max(1,activeExactMap.height) * 100))}%`, width:`${1 / Math.max(1,activeExactMap.width) * 100}%`, height:`${2 / Math.max(1,activeExactMap.height) * 100}%` }} onClick={() => selectTrainerOnMap(trainer)} title={`${trainer.trainer_name} · tile ${trainer.map_event.x}, ${trainer.map_event.y}`} aria-label={`Select ${trainer.trainer_name} at tile ${trainer.map_event.x}, ${trainer.map_event.y}`}><img src={`/static/emerald-trainers/${trainer.map_event.graphics_id}.png`} alt="" draggable="false" /></button>)}
+                    </div><div className="exact-map-caption">Emerald map render · {activeExactMap.width} × {activeExactMap.height} tiles · click a trainer marker</div></div>}
+                  </div>}
+                </section>
+
+                <section className="emerald-panel">
+                  <div className="emerald-panel-head"><strong>{filtered.length} matching trainers</strong><span>Bold gold = required</span></div>
+                  <div className="emerald-list">
+                    {filtered.length ? filtered.map((trainer) => (
+                      <button key={trainer.id} className={`emerald-trainer-row ${trainer.required ? "required" : ""} ${selected?.id === trainer.id ? "active" : ""}`} onClick={() => selectTrainerOnMap(trainer)}>
+                        {trainer.map_event?.graphics_id && <img className="trainer-list-sprite" src={`/static/emerald-trainers/${trainer.map_event.graphics_id}.png`} alt="" />}
+                        <span><span className="emerald-trainer-name"><span>{trainer.trainer_name}</span>{trainer.tier === "boss" && <span className="emerald-badge boss">BOSS</span>}{trainer.is_double && <span className="emerald-badge">DOUBLE</span>}</span>
+                        <span className="emerald-trainer-meta">{trainer.route}{trainer.sublocation ? ` · ${trainer.sublocation}` : ""} · {trainer.party.length} Pokémon · {trainer.checkpoint_count} save{trainer.checkpoint_count === 1 ? "" : "s"}</span></span>
+                      </button>
+                    )) : <div className="emerald-empty">No trainer matches these filters.</div>}
+                  </div>
+                </section>
+
+                <section className="emerald-panel">
+                  <div className="emerald-panel-head"><strong>Trainer card</strong><span>{selected ? `Sheet row ${selected.source_row}` : "No selection"}</span></div>
+                  {selected ? <div className="emerald-detail">
+                    <div className="emerald-kicker">{selected.is_double ? "DOUBLE BATTLE" : "SINGLE BATTLE"}</div>
+                    <h2>{selected.trainer_name}</h2>
+                    <div className="emerald-detail-route">{selected.route}{selected.sublocation ? ` · ${selected.sublocation}` : ""}{selected.money ? ` · ₽${selected.money}` : ""}</div>
+                    {selected.map_event && <div className="emerald-detail-route">Exact event: {selected.map_event.map_name} · tile ({selected.map_event.x}, {selected.map_event.y}) · sight {selected.map_event.sight}</div>}
+                    {selected.required && <div className="emerald-required-note">Required to advance the Emerald story line</div>}
+                    <button className="rnb-btn rnb-green" onClick={() => onPlanTrainer?.(selected.id)}>Plan this trainer</button>
+                    <div className="emerald-party">
+                      {selected.party.map((mon, index) => <div className="emerald-mon" key={`${selected.id}-${index}-${mon.species}`}>
+                        <div className="emerald-mon-head"><strong>{index + 1}. {mon.species}</strong><span>Lv. {mon.level ?? "?"}</span></div>
+                        <div className="emerald-moves">{(mon.moves || []).map((move) => <span className="emerald-move" key={move}>{move}</span>)}</div>
+                        <div className="emerald-mon-stats">
+                          <span><b>HP</b> {mon.stats?.hp ?? "—"}</span><span><b>ATK</b> {mon.stats?.attack ?? "—"}</span><span><b>DEF</b> {mon.stats?.defense ?? "—"}</span>
+                          <span><b>SPA</b> {mon.stats?.sp_attack ?? "—"}</span><span><b>SPD</b> {mon.stats?.sp_defense ?? "—"}</span><span><b>SPE</b> {mon.stats?.speed ?? "—"}</span>
+                        </div>
+                      </div>)}
+                    </div>
+                  </div> : <div className="emerald-empty">Choose a trainer to inspect its full party.</div>}
+                </section>
+              </div>
+            </div>
           </div>
         );
       }
@@ -2660,7 +3341,8 @@
         </section>;
       }
 
-      function ChangelogView() {
+      function ChangelogView({ gameMode }) {
+        if (gameMode === "emerald") return <div className="changelog-view"><h2>Pokémon Emerald</h2><div className="changelog-entry"><h3>Emerald submission mode</h3><p>The simulator, trainer atlas, Gen III calculator, level caps, hints, and route planner use the Pokémon Emerald dataset. Run & Bun history is kept out of this view.</p></div></div>;
         return (
           <div className="changelog-view">
             <h2>Changelog</h2>
@@ -2677,9 +3359,11 @@
         );
       }
 
-      function CalcView({ trainers, form, setForm, result, status, progress, runCalcSim, sample, onOpenFlowchart, savedRuns, onOpenSavedRun, onDeleteSavedRun, simulatorForm }) {
-        const [showLineFinder, setShowLineFinder] = useState(false);
+      function CalcView({ gameMode, trainers, form, setForm, result, status, progress, runCalcSim, sample, onOpenFlowchart, savedRuns, onOpenSavedRun, onDeleteSavedRun, simulatorForm }) {
+        const [showLineFinder, setShowLineFinder] = useState(true);
         const [trainerQuery, setTrainerQuery] = useState("");
+        const [localTeamStatus, setLocalTeamStatus] = useState("");
+        const levelCaps = gameMode === "emerald" ? (window.__EMERALD_DATA__?.level_caps || []) : [];
         const imported = useMemo(() => parseImportedPreview(form.imports), [form.imports]);
         const customEnemies = useMemo(() => parseImportedPreview(form.custom_enemy_imports), [form.custom_enemy_imports]);
         const builtInTrainer = trainers.find((trainer) => Number(trainer.id) === Number(form.trainer_id)) || trainers[0] || null;
@@ -2718,30 +3402,47 @@
           setForm({ ...form, [key]: next });
         }
 
+        async function loadEmeraldCheckpointTeam() {
+          setLocalTeamStatus("Reading your local Emerald checkpoint…");
+          try {
+            const response = await fetch("/api/games/emerald/local-save", { cache: "no-store" });
+            if (!response.ok) throw new Error(await response.text());
+            const data = await response.json();
+            setForm((current) => ({ ...current, imports: data.imports || current.imports }));
+            setLocalTeamStatus(`${data.party_count} Pokémon loaded with exact levels, IVs, EVs, moves, and HP.`);
+          } catch (error) {
+            setLocalTeamStatus(`Could not read the checkpoint: ${error.message}`);
+          }
+        }
+
+        function chooseTrainer(trainerId) {
+          const trainer = trainers.find((item) => Number(item.id) === Number(trainerId));
+          const ace = Math.max(1, ...(trainer?.party || []).map((mon) => Number(mon.level || 1)));
+          const nextCap = levelCaps.find((cap) => Number(cap.ace_level) >= ace)?.ace_level || form.level_cap || 100;
+          setForm({
+            ...form,
+            trainer_id: Number(trainerId),
+            enemy_leads: [0, 1],
+            level_cap: Number(nextCap),
+            imports: gameMode === "emerald"
+              ? (trainer?.checkpoint_roster_import || trainer?.checkpoint_team_import || form.imports)
+              : form.imports,
+          });
+        }
+
         return (
-          <section className="calc-engine-view" aria-label="Run and Bun calculator engine">
+          <section className="calc-engine-view battle-planner-only" aria-label={`${gameMode === "emerald" ? "Pokemon Emerald" : "Run and Bun"} battle planner`}>
             <div className="calc-engine-toolbar">
               <div>
-                <strong>Dekzeh Run & Bun Calc</strong> embedded from the maintained calculator, with Line Finder available in-panel.
+                <strong>{gameMode === "emerald" ? "Captured battle planner" : "Run & Bun battle planner"}</strong> {gameMode === "emerald" ? "uses only fights decoded from this completed Emerald run. Choose a checkpoint and test the saved roster—no ROM or manual calculator required." : "finds a full line from the selected trainer and party."}
               </div>
-              <div className="calc-toolbar-actions">
-                <button className={`tab ${showLineFinder ? "active" : ""}`} onClick={() => setShowLineFinder((shown) => !shown)}>Line Finder</button>
-                <a href="https://dekzeh.github.io/calc/" target="_blank" rel="noreferrer">Open full calc</a>
-              </div>
+              {gameMode === "emerald" && <div className="checkpoint-count-chip">{window.__EMERALD_DATA__?.checkpoint_library?.stats?.checkpoints || trainers.length} captured saves</div>}
             </div>
             <div className="calc-engine-body">
-              <iframe
-                className="calc-engine-frame"
-                title="Dekzeh Run and Bun calculator"
-                src="https://dekzeh.github.io/calc/"
-                referrerPolicy="strict-origin-when-cross-origin"
-                allow="clipboard-write"
-              />
               {showLineFinder && (
                 <aside className="line-finder-drawer" aria-label="Line finder">
                   <header>
-                    <span>Line Finder</span>
-                    <button onClick={() => setShowLineFinder(false)}>Close</button>
+                    <span>Battle setup</span>
                   </header>
                   <div className="line-finder-body">
                     <div className="rnb-small-note">Use the embedded calc as your workspace, then run this panel to find the best team member and projected line against the selected trainer.</div>
@@ -2773,7 +3474,7 @@
                       className="rnb-select-full"
                       size={Math.min(7, Math.max(2, filteredTrainers.length + (selectedTrainerIsVisible ? 0 : 1)))}
                       value={selectedTrainerIsVisible ? form.trainer_id : ""}
-                      onChange={(event) => setForm({ ...form, trainer_id: Number(event.target.value), enemy_leads: [0, 1] })}
+                      onChange={(event) => chooseTrainer(event.target.value)}
                       aria-label="Trainer search results"
                     >
                       {!selectedTrainerIsVisible && <option value="" disabled>Select a matching trainer</option>}
@@ -2863,6 +3564,22 @@
                       </button>
                     </div>
 
+                    {gameMode === "emerald" && <div className="hint-setup-card">
+                      <label>Battle rules
+                        <select className="rnb-select-full" value={form.ruleset || "hardcore-nuzlocke"} onChange={(event) => {
+                          const ruleset = event.target.value;
+                          setForm({ ...form, ruleset, items_in_battle:ruleset === "standard" || ruleset === "nuzlocke" });
+                        }}><option value="hardcore-nuzlocke">Hardcore Nuzlocke · no battle items</option><option value="nuzlocke">Nuzlocke · battle items allowed</option><option value="standard">Standard Emerald</option></select>
+                      </label>
+                      <div className="hint-setup-head"><div><strong>Hint mode</strong><span>Reveal help one step at a time instead of showing the whole answer.</span></div><button type="button" className={form.hint_mode ? "active" : ""} onClick={() => setForm((current) => ({ ...current, hint_mode: !current.hint_mode }))}>{form.hint_mode ? "ON" : "OFF"}</button></div>
+                      <label>Current level cap
+                        <select className="rnb-select-full" value={form.level_cap || 15} onChange={(event) => setForm({ ...form, level_cap: Number(event.target.value) })}>
+                          {levelCaps.map((cap) => <option value={cap.ace_level} key={`cap-${cap.badge}`}>Badge {cap.badge}: {cap.trainer_name.replace("Leader ", "")} · cap {cap.ace_level}</option>)}
+                        </select>
+                      </label>
+                      <div className="rnb-small-note">The solver may analyze an already-overleveled Pokémon, but it will never recommend exceeding this cap.</div>
+                    </div>}
+
                     <label>Import your available team</label>
                     <textarea
                       className="rnb-textarea-full"
@@ -2876,7 +3593,9 @@
                         {status === "running" ? "Finding..." : form.crit_safe ? "Find Crit-Safe Line" : "Find Best Team + Line"}
                       </button>
                       <button className="rnb-btn" onClick={() => setForm({ ...form, imports: sample || form.imports })}>Load Sample Team</button>
+                      {gameMode === "emerald" && <button className="rnb-btn" onClick={loadEmeraldCheckpointTeam}>Load My Emerald Checkpoint</button>}
                     </div>
+                    {localTeamStatus && <div className="rnb-small-note">{localTeamStatus}</div>}
                     {status === "running" && progress && (
                       <div className="lf-progress">
                         <div className="lf-progress-track"><div className="lf-progress-fill" style={{ width: `${progress.pct || 0}%` }} /></div>
@@ -3078,7 +3797,7 @@
       function buildLineFinderReport(result, selectedTrainer) {
         if (!result) return "";
         const lines = [];
-        lines.push("Run & Bun Line Finder Report");
+        lines.push(`${result.game_label || "Run & Bun"} Line Finder Report`);
         lines.push("");
         if (selectedTrainer) {
           lines.push(`Trainer: ${selectedTrainer.label}`);
@@ -4380,11 +5099,26 @@
         return openDocInNewTab(buildBattlePlanDocument(result, selectedTrainer, heartScaleOverride));
       }
 
+      function PreparationDiagnosis({ diagnosis }) {
+        if (!diagnosis || diagnosis.status === "ready") return null;
+        return <div className="prep-diagnosis" data-testid="preparation-diagnosis">
+          <strong>Why this setup stopped—and what to change</strong>
+          <p>{diagnosis.summary}</p>
+          {(diagnosis.blockers || []).map((blocker, index) => <div className="prep-blocker" key={`${blocker.kind}-${index}`}>
+            <b>{blocker.title}</b><span>{blocker.evidence}</span><small>Do this: {blocker.action}</small>
+          </div>)}
+          {(diagnosis.recommended_steps || []).length > 0 && <ol className="prep-steps">{diagnosis.recommended_steps.map((step, index) => <li key={`prep-step-${index}`}>{step}</li>)}</ol>}
+          {diagnosis.ev_policy && <small>{diagnosis.ev_policy}</small>}
+        </div>;
+      }
+
       function RnbSimOutput({ result, selectedTrainer, onOpenFlowchart, simulatorForm }) {
         const [copyStatus, setCopyStatus] = useState("");
         const [gbaValidation, setGbaValidation] = useState(null);
         const [gbaValidationStatus, setGbaValidationStatus] = useState("idle");
         const [heartScales, setHeartScales] = useState("");
+        const [revealedHints, setRevealedHints] = useState(1);
+        useEffect(() => setRevealedHints(1), [result?.saved_run?.id, result?.trainer]);
         async function copyReport() {
           try {
             await copyTextToClipboard(buildLineFinderReport(result, selectedTrainer));
@@ -4409,6 +5143,7 @@
               body: JSON.stringify({
                 result: compactResult,
                 trainer_label: selectedTrainer?.label || result.trainer || "Battle Plan",
+                game_mode: result.game_mode || "run-and-bun",
               }),
             });
             if (!response.ok) throw new Error(await response.text());
@@ -4465,6 +5200,25 @@
           }
         }
         const estScales = estimateHeartScales(selectedTrainer);
+        if (result?.hint_mode && revealedHints < 5) {
+          const hints = result.progressive_hints || [];
+          const levels = result.level_guidance || {};
+          return <section className="rnb-sim-output" aria-label="Progressive battle hints">
+            <div className="rnb-panel-title">Hint Mode · {result.trainer}</div>
+            <div className="rnb-panel-body">
+              <div className="hint-result">
+                <div><strong>{revealedHints} of 4 hints revealed</strong><div className="rnb-muted">The full team and turn-by-turn line remain hidden.</div></div>
+                {levels.over_cap?.length > 0 && <div className="hint-level-warning">Level cap {levels.cap}: {levels.over_cap.join(", ")} already exceed it. They may be analyzed, but the planner will not recommend additional levels.</div>}
+                {hints.slice(0, revealedHints).map((hint) => <div className="hint-step" key={`hint-${hint.level}`}><strong>Hint {hint.level}: {hint.title}</strong><span>{hint.text}</span></div>)}
+                {result.result !== "win-line" && <PreparationDiagnosis diagnosis={result.failure_diagnosis} />}
+                <div className="rnb-actions">
+                  <button className="rnb-btn rnb-green" onClick={() => setRevealedHints((value) => Math.min(5, value + 1))}>{revealedHints < 4 ? "Reveal next hint" : "Show the full plan"}</button>
+                  {revealedHints > 1 && <button className="rnb-btn" onClick={() => setRevealedHints(1)}>Reset hints</button>}
+                </div>
+              </div>
+            </div>
+          </section>;
+        }
         return (
           <section className="rnb-sim-output" aria-label="Sim Calc output">
             <div className="rnb-panel-title">Sim Calc Output</div>
@@ -4528,6 +5282,8 @@
                       {(gbaValidation.warnings || []).length > 0 && <div className="rnb-muted">Safe replay notes: {gbaValidation.warnings.join(" · ")}</div>}
                     </div>}
                   </div>
+                  <VideoPicker videos={result.videos || []} title={`${result.trainer || "Simulator"} replay`} subtitle="Generated with the complementary turn-by-turn text log" />
+                  <PreparationDiagnosis diagnosis={result.failure_diagnosis} />
                   {(result.strategy_report || []).some((strategy) => strategy.used) && (
                     <div className="rnb-turn-row">
                       <strong>Tactical game plan</strong>
@@ -4654,30 +5410,8 @@
 
       function TrainerDropdown({ trainers, value, onChange, label, disabledBeforeId = null }) {
         const [query, setQuery] = useState("");
-        const [fallbackTrainers, setFallbackTrainers] = useState([]);
-        const [catalogStatus, setCatalogStatus] = useState("idle");
-        const catalog = (trainers || []).length ? trainers : fallbackTrainers;
-        useEffect(()=>{
-          if ((trainers || []).length) { setCatalogStatus("ready"); return; }
-          let cancelled = false;
-          let timer = null;
-          let attempt = 0;
-          const load = async () => {
-            setCatalogStatus(attempt ? "retrying" : "loading");
-            try {
-              const response = await fetch("/api/calc/trainers", { cache: "no-store" });
-              if (!response.ok) throw new Error(String(response.status));
-              const data = await response.json();
-              if (!(data.trainers || []).length) throw new Error("empty");
-              if (!cancelled) { setFallbackTrainers(data.trainers); setCatalogStatus("ready"); }
-            } catch (_error) {
-              attempt += 1;
-              if (!cancelled) timer = setTimeout(load, Math.min(2500, 400 * attempt));
-            }
-          };
-          load();
-          return ()=>{ cancelled = true; if (timer) clearTimeout(timer); };
-        }, [(trainers || []).length]);
+        const [open, setOpen] = useState(false);
+        const catalog = trainers || [];
         const selected = catalog.find((trainer)=>Number(trainer.id) === Number(value));
         const normalized = query.trim().toLowerCase();
         const options = catalog.filter((trainer) => {
@@ -4688,26 +5422,54 @@
         const minimumIndex = disabledBeforeId == null ? -1 : catalog.findIndex((trainer)=>Number(trainer.id) === Number(disabledBeforeId));
         function choose(trainer) {
           onChange(Number(trainer.id));
+          setOpen(false);
+          setQuery("");
         }
-        return <div className="trainer-search-panel">
+        return <div className="trainer-dropdown">
           <label>{label}</label>
-          <input type="search" value={query} onChange={(event)=>setQuery(event.target.value)} placeholder="Search trainer, class, location, or double…" aria-label={`Search ${label.toLowerCase()}`} />
-          <div className="trainer-search-count">{catalog.length ? `${options.length} of ${catalog.length} trainers${selected ? ` · selected: ${selected.label}` : ""}` : catalogStatus === "retrying" ? "Retrying trainer database…" : "Loading trainer database…"}</div>
-          <div className="trainer-dropdown-options trainer-search-visible" role="listbox" aria-label={`${label} options`}>
-            {options.length ? options.map((trainer) => {
-              const trainerIndex = catalog.findIndex((item)=>Number(item.id) === Number(trainer.id));
-              const disabled = minimumIndex >= 0 && trainerIndex < minimumIndex;
-              return <button type="button" role="option" aria-selected={Number(trainer.id) === Number(value)} disabled={disabled} className={Number(trainer.id) === Number(value) ? "active" : ""} onClick={()=>choose(trainer)} key={`${label}-${trainer.id}`}><span>{trainer.is_double ? "2v2 · " : ""}{trainer.trainer_name}</span><small>{trainer.location}</small></button>;
-            }) : <div className="trainer-search-empty">{catalog.length ? "No trainers match that search." : "Trainer database is loading. This list will update automatically."}</div>}
-          </div>
+          <button type="button" className="trainer-dropdown-trigger" aria-haspopup="listbox" aria-expanded={open} onClick={()=>setOpen((current)=>!current)}>
+            <span>{selected ? `${selected.is_double ? "2v2 · " : ""}${selected.trainer_name}` : "Choose a trainer"}</span>
+            <small>{selected ? selected.location : `${catalog.length} trainers available`}</small>
+          </button>
+          {open && <div className="trainer-dropdown-popover">
+            <input autoFocus type="search" value={query} onChange={(event)=>setQuery(event.target.value)} placeholder="Search trainer, class, location, or double…" aria-label={`Search ${label.toLowerCase()}`} />
+            <div className="trainer-search-count">{options.length} of {catalog.length} trainers</div>
+            <div className="trainer-dropdown-options" role="listbox" aria-label={`${label} options`}>
+              {options.length ? options.map((trainer) => {
+                const trainerIndex = catalog.findIndex((item)=>Number(item.id) === Number(trainer.id));
+                const disabled = minimumIndex >= 0 && trainerIndex < minimumIndex;
+                return <button type="button" role="option" aria-selected={Number(trainer.id) === Number(value)} disabled={disabled} className={Number(trainer.id) === Number(value) ? "active" : ""} onClick={()=>choose(trainer)} key={`${label}-${trainer.id}`}><span>{trainer.is_double ? "2v2 · " : ""}{trainer.trainer_name}</span><small>{trainer.location}</small></button>;
+              }) : <div className="trainer-search-empty">No trainers match that search.</div>}
+            </div>
+          </div>}
         </div>;
       }
 
-      function GauntletSetupModal({ trainers, form, setForm, onClose, onRun, running }) {
-        const [query, setQuery] = useState("breeder");
+      function GauntletSetupModal({ gameMode, trainers, form, setForm, onClose, onRun, running, teamImports, setTeamImports, localForm }) {
+        const [query, setQuery] = useState(gameMode === "emerald" ? "" : "breeder");
         const selected = form.trainer_ids || [];
         const normalized = query.trim().toLowerCase();
         const matches = trainers.filter((trainer) => !normalized || `${trainer.trainer_name} ${trainer.location} ${trainer.label}`.toLowerCase().includes(normalized));
+        const visibleMatches = matches.slice(0, 24);
+        function applyRuleset(ruleset) {
+          const presets = {
+            "hardcore-nuzlocke": { items_in_battle:false, allow_revives:false },
+            "nuzlocke": { items_in_battle:true, allow_revives:false },
+            "standard": { items_in_battle:true, allow_revives:true },
+          };
+          setForm({ ...form, ruleset, ...(presets[ruleset] || {}) });
+        }
+        function useEliteFourRoute() {
+          const names = ["Elite Four Sidney", "Elite Four Phoebe", "Elite Four Glacia", "Elite Four Drake", "Champion Wallace"];
+          const route = names.map((name) => trainers.find((trainer) => trainer.trainer_name === name)).filter(Boolean);
+          if (route.length !== 5) return;
+          setForm({
+            ...form, trainer_ids: route.map((trainer) => trainer.id), route_mode:"until",
+            start_trainer_id:route[0].id, end_trainer_id:route[4].id, next_count:4,
+            healing_mode:"bag", back_to_back:false, ruleset:"hardcore-nuzlocke",
+            items_in_battle:false, allow_revives:false, hint_mode:false, max_total_faints:3,
+          });
+        }
         function buildRoute(changes) {
           const next = { ...form, ...changes };
           const startIndex = trainers.findIndex((trainer) => trainer.id === Number(next.start_trainer_id));
@@ -4720,19 +5482,34 @@
             route = trainers.slice(startIndex, startIndex + Math.max(0, Number(next.next_count || 0)) + 1);
             next.end_trainer_id = route[route.length - 1]?.id ?? next.start_trainer_id;
           }
+          if (gameMode === "emerald" && next.required_path) {
+            route = route.filter((trainer) => trainer.required);
+          }
           setForm({ ...next, trainer_ids: route.map((trainer) => trainer.id) });
         }
         return <div className="gauntlet-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
           <section className="gauntlet-modal" role="dialog" aria-modal="true" aria-label="Set up consecutive battles">
             <div className="gauntlet-modal-head">
-            <div><div className="sim-kicker">GAUNTLET · MULTIPLE FIGHTS</div><h2>Build the trainer route.</h2><p>Gauntlet runs trainers in succession. For one trainer, use Simulator. Center visits are recorded: heal, open the real PC, show the chosen party and items, then walk to the fight.</p></div>
+            <div><div className="sim-kicker">GAUNTLET · MULTIPLE FIGHTS</div><h2>Build the trainer route.</h2><p>{gameMode === "emerald" ? "Gauntlet plans trainers in succession. It carries damage forward or models a Center and PC visit between fights. Routes with a supported overworld replay say so explicitly." : "Gauntlet runs trainers in succession. For one trainer, use Simulator. Center visits are recorded: heal, open the real PC, show the chosen party and items, then walk to the fight."}</p></div>
               <button onClick={onClose} aria-label="Close gauntlet setup">Close</button>
             </div>
-            <div className="gauntlet-mode" aria-label="Between battle healing">
-              <button className={form.back_to_back ? "active" : ""} onClick={() => setForm({ ...form, back_to_back: true })}>
+            {gameMode === "emerald" && <button className="elite-four-preset" onClick={useEliteFourRoute}><span>RECOMMENDED JUDGE TEST</span><strong>Load the Elite Four → Wallace Gauntlet</strong><small>Five fights · Hardcore Nuzlocke · bag healing between rooms · no Revives</small></button>}
+            <div className="ruleset-grid" aria-label="Battle rules">
+              <label>Ruleset<select value={form.ruleset || "hardcore-nuzlocke"} onChange={(event) => applyRuleset(event.target.value)}><option value="hardcore-nuzlocke">Hardcore Nuzlocke</option><option value="nuzlocke">Nuzlocke</option><option value="standard">Standard Emerald</option><option value="custom">Custom</option></select></label>
+              <label>Last-resort leveling<select value={form.leveling_policy || "party-max"} onChange={(event) => setForm({ ...form, leveling_policy:event.target.value })}><option value="none">Never level</option><option value="party-max">Rare Candy to current party max</option><option value="boss-cap">Rare Candy up to boss ace</option></select></label>
+              <label>Sacrifice fallback<select value={Number(form.max_total_faints ?? 3)} onChange={(event) => setForm({ ...form, max_total_faints:Number(event.target.value) })}><option value="0">Zero faints only</option><option value="1">Prefer zero · allow 1</option><option value="2">Prefer zero · allow 2</option><option value="3">Prefer zero · allow up to 3</option></select></label>
+              <button className={form.items_in_battle ? "active" : ""} onClick={() => setForm({ ...form, ruleset:"custom", items_in_battle:!form.items_in_battle })}>Items in battle: {form.items_in_battle ? "YES" : "NO"}</button>
+              <button className={form.allow_revives ? "active" : ""} onClick={() => setForm({ ...form, ruleset:"custom", allow_revives:!form.allow_revives })}>Revives: {form.allow_revives ? "YES" : "NO"}</button>
+              <button className={form.hint_mode ? "active" : ""} onClick={() => setForm({ ...form, hint_mode:!form.hint_mode })}>Hint mode: {form.hint_mode ? "ON" : "OFF"}</button>
+            </div>
+            <div className="gauntlet-mode three" aria-label="Between battle healing">
+              <button className={(form.healing_mode || "bag") === "none" ? "active" : ""} onClick={() => setForm({ ...form, healing_mode:"none", back_to_back: true })}>
                 <strong>Back-to-back battles</strong><small>No healing. HP, status, faints, and consumed berries carry into the next trainer.</small>
               </button>
-              <button className={!form.back_to_back ? "active" : ""} onClick={() => setForm({ ...form, back_to_back: false })}>
+              <button className={(form.healing_mode || "bag") === "bag" ? "active" : ""} onClick={() => setForm({ ...form, healing_mode:"bag", back_to_back: false })}>
+                <strong>Bag healing</strong><small>Restore HP, status, and PP between fights using owned supplies. The party cannot visit the PC.</small>
+              </button>
+              <button className={form.healing_mode === "pokemon-center" ? "active" : ""} onClick={() => setForm({ ...form, healing_mode:"pokemon-center", back_to_back: false })}>
                 <strong>Center + PC between fights</strong><small>Heal, inspect the full live PC box, switch the party, and redistribute only held items the save actually owns.</small>
               </button>
             </div>
@@ -4744,18 +5521,22 @@
                 <strong>Fight through a target</strong><small>Continue from the starting trainer until the selected target trainer is beaten, inclusive.</small>
               </button>
             </div>
+            {gameMode === "emerald" && <div className="gauntlet-mode" aria-label="Emerald story path">
+              <button className={!form.required_path ? "active" : ""} onClick={() => buildRoute({ required_path: false })}><strong>Every trainer in order</strong><small>Include optional trainers between the selected start and finish.</small></button>
+              <button className={form.required_path ? "active" : ""} onClick={() => buildRoute({ required_path: true })}><strong>Required story path</strong><small>Use only the bold required trainers from the Emerald sheet.</small></button>
+            </div>}
             <div className="grid2">
               <TrainerDropdown trainers={trainers} value={form.start_trainer_id} onChange={(trainerId)=>buildRoute({start_trainer_id:trainerId})} label="Starting trainer" />
               {form.route_mode === "until" ? <TrainerDropdown trainers={trainers} value={form.end_trainer_id} onChange={(trainerId)=>buildRoute({end_trainer_id:trainerId})} label="Final trainer to beat" disabledBeforeId={form.start_trainer_id} />
-                : <label>Trainers after the start<input type="number" min="1" max="19" value={form.next_count ?? 4} onChange={(event) => buildRoute({ next_count: Math.max(1, Math.min(19, Number(event.target.value) || 1)) })} /></label>}
+                : <label>Trainers after the start<input type="number" min="1" max="511" value={form.next_count ?? 4} onChange={(event) => buildRoute({ next_count: Math.max(1, Math.min(511, Number(event.target.value) || 1)) })} /></label>}
             </div>
             <div className="gauntlet-builder">
               <div className="gauntlet-search-results">
                 <label>Search every trainer</label>
                 <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Try breeder, Corgi, Route 116…" />
-                <div className="trainer-search-count">{matches.length} of {trainers.length} trainers match · no result cap</div>
+                <div className="trainer-search-count">{matches.length} of {trainers.length} trainers match{matches.length > visibleMatches.length ? ` · showing the first ${visibleMatches.length}` : ""}</div>
                 <div className="gauntlet-search-list">
-                  {matches.map((trainer) => <div className="gauntlet-search-row" key={`gauntlet-search-${trainer.id}`}><span>{trainer.label}</span><div className="gauntlet-queue-actions"><button onClick={() => buildRoute({ start_trainer_id: trainer.id })}>Start here</button>{form.route_mode === "until" && <button onClick={() => buildRoute({ end_trainer_id: trainer.id })}>End here</button>}</div></div>)}
+                  {visibleMatches.map((trainer) => <div className="gauntlet-search-row" key={`gauntlet-search-${trainer.id}`}><span>{trainer.label}</span><div className="gauntlet-queue-actions"><button onClick={() => buildRoute({ start_trainer_id: trainer.id })}>Start here</button>{form.route_mode === "until" && <button onClick={() => buildRoute({ end_trainer_id: trainer.id })}>End here</button>}</div></div>)}
                 </div>
               </div>
               <div className="gauntlet-queue">
@@ -4769,47 +5550,148 @@
                 })}
               </div>
             </div>
+            <div className="simulator-state-box">
+              <strong>Party source</strong>
+              <div className="sim-read-status">{gameMode === "emerald" ? "The starting trainer loads the exact party and legal Box 1–12 roster decoded from its captured checkpoint. No ROM or local save is needed." : `The app reads the party and PC from ${localForm?.pc_state || localForm?.state || "your selected save"}.`}</div>
+              <details>
+                <summary>Use an imported team if the save cannot be read</summary>
+                <textarea className="rnb-textarea" value={teamImports || ""} onChange={(event) => setTeamImports(event.target.value)} placeholder="Paste Pokémon Showdown team text here" />
+              </details>
+            </div>
             <div className="gauntlet-modal-actions">
-              <div className="node-meta">Crit-aware planning stays on. An uncontrolled non-critical line that repeatedly strands an answer at exactly 1 HP is rejected in favor of a safer box alternative; a modeled critical survival is not rejected merely for being low. Box 14 is permanently excluded as the Nuzlocke graveyard.</div>
+              <div className="node-meta">The solver always ranks zero-faint routes first, then uses no more than the selected sacrifice fallback. Sacrificed Pokémon stay dead because Revives are disabled. Box 13 and Box 14 remain excluded. Every run saves both an MP4 replay and its full text log.</div>
               <button className="primary" onClick={onRun} disabled={running || selected.length < 2}>{running ? "Solving…" : `Solve ${selected.length} fights`}</button>
             </div>
           </section>
         </div>;
       }
 
+      function videosForRun(run) {
+        if (run?.comparison) {
+          return [
+            { label: "Original team", video_url: run.comparison.original_video_url, video_ready: Boolean(run.comparison.original_video_url) },
+            { label: "Approved team", video_url: run.comparison.approved_video_url, video_ready: Boolean(run.comparison.approved_video_url) },
+          ].filter((video) => video.video_ready);
+        }
+        if ((run?.videos || []).length) return run.videos.filter((video) => video.video_ready && video.video_url);
+        if (run?.video_ready && run?.video_url) return [{ label: "Full game replay", video_url: run.video_url, video_ready: true }];
+        return [];
+      }
+
+      function VideoLightbox({ title, subtitle, videos, initialIndex = 0, onClose }) {
+        const [index, setIndex] = useState(initialIndex);
+        const selectedVideo = videos[index] || videos[0];
+        useEffect(() => {
+          const onKeyDown = (event) => { if (event.key === "Escape") onClose(); };
+          window.addEventListener("keydown", onKeyDown);
+          return () => window.removeEventListener("keydown", onKeyDown);
+        }, [onClose]);
+        if (!selectedVideo) return null;
+        return <div className="video-lightbox" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+          <section className="video-lightbox-dialog" role="dialog" aria-modal="true" aria-label={title || "Recorded replay"}>
+            <div className="video-lightbox-head"><div><strong>{selectedVideo.label || title || "Recorded replay"}</strong><span>{subtitle || title || "Uncut game recording"}</span></div><button onClick={onClose} aria-label="Close video">Close</button></div>
+            <video className="video-lightbox-player" key={selectedVideo.video_url} controls autoPlay preload="metadata" src={selectedVideo.video_url} />
+            {videos.length > 1 && <div className="video-lightbox-switcher" aria-label="Videos in this run">{videos.map((video, videoIndex) => <button className={videoIndex === index ? "active" : ""} onClick={() => setIndex(videoIndex)} key={`${video.video_url}-${videoIndex}`}>{video.label || `Replay ${videoIndex + 1}`}</button>)}</div>}
+          </section>
+        </div>;
+      }
+
+      function VideoPicker({ videos, title, subtitle }) {
+        const readyVideos = (videos || []).filter((video) => video.video_ready && video.video_url);
+        const [openIndex, setOpenIndex] = useState(null);
+        if (!readyVideos.length) return null;
+        return <>
+          <div className="video-picker">{readyVideos.map((video, index) => <button onClick={() => setOpenIndex(index)} key={`${video.video_url}-${index}`}>Watch · {video.label || `Replay ${index + 1}`}</button>)}</div>
+          {openIndex !== null && <VideoLightbox title={title} subtitle={subtitle} videos={readyVideos} initialIndex={openIndex} onClose={() => setOpenIndex(null)} />}
+        </>;
+      }
+
+      function EvidenceLibrary({ runs, kind }) {
+        const [openDays, setOpenDays] = useState({});
+        const [viewer, setViewer] = useState(null);
+        const groups = useMemo(() => {
+          const grouped = new Map();
+          (runs || []).forEach((run) => {
+            const created = run.created_at ? new Date(run.created_at) : null;
+            const validDate = created && !Number.isNaN(created.getTime());
+            const key = validDate ? `${created.getFullYear()}-${String(created.getMonth() + 1).padStart(2,"0")}-${String(created.getDate()).padStart(2,"0")}` : "unknown";
+            if (!grouped.has(key)) grouped.set(key, { key, date: validDate ? created : null, runs: [] });
+            grouped.get(key).runs.push(run);
+          });
+          return [...grouped.values()].sort((a, b) => (b.date?.getTime() || 0) - (a.date?.getTime() || 0));
+        }, [runs]);
+        const statusFor = (run) => run.proof_complete ? "CARTRIDGE VERIFIED" : run.strategy_status === "team_change_required" ? "TEAM CHANGE REQUIRED" : run.strategy_status === "conditionally_approved" ? "CRIT PIVOT READY" : run.result === "route-complete" ? "PROOF INCOMPLETE" : "STOPPED";
+        const titleFor = (run) => kind === "gauntlet" ? `${run.completed || 0} of ${run.queued || 0} fights completed` : (run.trainer || "Simulator run");
+        const detailFor = (run) => kind === "gauntlet"
+          ? (run.proof_complete ? `${run.emulator_validation?.fixed_deathless_wins ?? 0}/${run.emulator_validation?.fixed_replays ?? 0} deathless uncut replays${run.emulator_validation?.minimum_player_hp ? ` · minimum observed HP ${run.emulator_validation.minimum_player_hp}` : ""} · preparation and travel included.` : (run.proof_error || run.stopped_reason || "Saved planner diagnosis."))
+          : `${run.turn_count || 0} turns · ${run.player_faints || 0} faints · ${run.confidence_replays || 0} confidence replays`;
+        return <>
+          <div className="evidence-library">
+            {groups.map((group) => {
+              const open = Boolean(openDays[group.key]);
+              const videoCount = group.runs.reduce((total, run) => total + videosForRun(run).length, 0);
+              const label = group.date ? group.date.toLocaleDateString(undefined, { weekday:"long", month:"long", day:"numeric", year:"numeric" }) : "Date unavailable";
+              return <section className={`evidence-day ${open ? "open" : ""}`} key={group.key}>
+                <button className="evidence-day-toggle" onClick={() => setOpenDays((days) => ({ ...days, [group.key]: !open }))} aria-expanded={open}>
+                  <span className="evidence-day-chevron">⌄</span><span className="evidence-day-title"><strong>{label}</strong><span>{group.runs.length} saved {group.runs.length === 1 ? "run" : "runs"}</span></span><span className="evidence-day-count">{videoCount} {videoCount === 1 ? "video" : "videos"}</span>
+                </button>
+                {open && <div className="evidence-run-list">{group.runs.map((run) => {
+                  const videos = videosForRun(run);
+                  const created = run.created_at ? new Date(run.created_at) : null;
+                  const time = created && !Number.isNaN(created.getTime()) ? created.toLocaleTimeString([], { hour:"numeric", minute:"2-digit" }) : "Saved run";
+                  const logHref = kind === "gauntlet" ? `/api/calc/gauntlet/runs/${encodeURIComponent(run.id)}` : `/api/simulator/runs/${encodeURIComponent(run.id)}`;
+                  return <article className="evidence-run-row" key={run.id}>
+                    <div className="evidence-run-copy"><strong>{time} · {titleFor(run)}</strong><span>{detailFor(run)}</span></div>
+                    <div className="evidence-run-actions"><span className="evidence-badge">{statusFor(run)}</span>{videos.length ? <button className="evidence-watch" onClick={() => setViewer({ run, videos })}>Watch {videos.length === 1 ? "video" : `${videos.length} videos`}</button> : <span className="evidence-badge">NO VIDEO</span>}<a href={logHref} target="_blank">Full log</a></div>
+                  </article>;
+                })}</div>}
+              </section>;
+            })}
+          </div>
+          {viewer && <VideoLightbox title={titleFor(viewer.run)} subtitle={viewer.run.created_at ? new Date(viewer.run.created_at).toLocaleString() : "Saved replay"} videos={viewer.videos} onClose={() => setViewer(null)} />}
+        </>;
+      }
+
       function GauntletTeamState({ team }) {
         return <>{(team || []).map((member, index) => <div className="gauntlet-mon-state" key={`${member.name}-${member.slot ?? index}`}><span>{member.name}{member.status ? ` · ${member.status}` : ""}{member.consumed_item ? " · item used" : ""}</span><strong>{member.hp}/{member.max_hp}</strong></div>)}</>;
       }
 
-      function GauntletView({ trainers, form, result, status, progress, onConfigure, onRunProven, savedRuns, localForm, setLocalForm }) {
+      function GauntletView({ gameMode, trainers, form, result, status, progress, onConfigure, onRunProven, savedRuns, localForm, setLocalForm }) {
         const [playbooks, setPlaybooks] = useState([]);
         useEffect(() => {
+          if (gameMode === "emerald") {
+            setPlaybooks([]);
+            return;
+          }
           fetch("/api/calc/gauntlet/playbooks").then((response) => response.json()).then((data) => {
             setPlaybooks(data.playbooks || []);
           }).catch(() => setPlaybooks([{ id:"unavailable", ready:false, error:"Preflight unavailable" }]));
-        }, []);
+        }, [gameMode]);
         const queue = (form.trainer_ids || []).map((id) => trainers.find((trainer) => trainer.id === id)).filter(Boolean);
         const verifiedRuns = (savedRuns || []).filter((run) => run.proof_complete);
-        const localInputsReady = Boolean(localForm.rom && localForm.pc_state);
-        const featuredPlaybook = [...playbooks]
-          .filter((item) => item.ready)
-          .sort((a, b) => Number(b.trainer_count || 0) - Number(a.trainer_count || 0))[0];
+        const readyPlaybooks = playbooks.filter((item) => item.ready);
+        const featuredPlaybook = readyPlaybooks.find((item) => {
+          const ids = item.trainer_ids || [];
+          return ids.length === form.trainer_ids.length && ids.every((id, index) => Number(id) === Number(form.trainer_ids[index]));
+        }) || [...readyPlaybooks].sort((a, b) => Number(b.trainer_count || 0) - Number(a.trainer_count || 0))[0];
+        const localInputsReady = Boolean(localForm.rom && (localForm.pc_state || localForm.state || featuredPlaybook?.starting_state));
         return <section className="gauntlet-view" aria-label="Multi-fight gauntlet solver">
           <div className="gauntlet-hero">
-            <div><div className="sim-kicker">EMULATOR-BACKED POKEMON SEARCH</div><h2>Plan the route. Replay it on the cartridge.</h2><p>{queue.length ? queue.map((trainer) => trainer.trainer_name).join(" → ") : "The strongest saved run below cleared eight connected fights twice with no cuts or mid-run state reloads."}</p></div>
-            <div className="sim-action-row"><button className="ghost" onClick={onConfigure}>Configure route</button>{featuredPlaybook && <button className="primary" onClick={()=>onRunProven(featuredPlaybook)} disabled={progress?.running || !localInputsReady}>{progress?.running ? "Running in game…" : localInputsReady ? `Run ${featuredPlaybook.trainer_count}-fight proof` : "Add local inputs to run"}</button>}</div>
+            <div><div className="sim-kicker">{gameMode === "emerald" ? "POKÉMON EMERALD ROUTE PLANNER" : "EMULATOR-BACKED POKEMON SEARCH"}</div><h2>{gameMode === "emerald" ? "Plan several fights from one real save." : "Plan the route. Replay it on the cartridge."}</h2><p>{queue.length ? queue.map((trainer) => trainer.trainer_name).join(" → ") : (gameMode === "emerald" ? "Choose a starting trainer and how far to continue. The planner carries HP and status or models a Center visit between fights." : "The strongest saved run below cleared eight connected fights twice with no cuts or mid-run state reloads.")}</p></div>
+            <div className="sim-action-row"><button className="ghost" onClick={onConfigure}>Configure route</button>{featuredPlaybook && <button className="primary" onClick={()=>onRunProven(featuredPlaybook)} disabled={progress?.running || !localInputsReady}>{progress?.running ? "Running in game…" : localInputsReady ? `Run this ${featuredPlaybook.trainer_count}-fight route` : "Add the ROM to run"}</button>}</div>
           </div>
-          <div className={`sim-line-record ${playbooks.length && !playbooks.some((item)=>item.ready) ? "sim-video-error" : ""}`}><strong>{playbooks.some((item)=>item.ready) ? "PLAYBOOKS READY" : "CHECKING PLAYBOOKS"}</strong> · {playbooks.some((item)=>item.ready) ? playbooks.filter((item)=>item.ready).map((item)=>`${item.label} (${item.trainer_count} fights)`).join(" · ") : (playbooks[0]?.error || "validating routes, battle inputs, Box rules, and recording assets")}</div>
+          {gameMode !== "emerald" && <div className={`sim-line-record ${playbooks.length && !playbooks.some((item)=>item.ready) ? "sim-video-error" : ""}`}><strong>{playbooks.some((item)=>item.ready) ? "PLAYBOOKS READY" : "CHECKING PLAYBOOKS"}</strong> · {playbooks.some((item)=>item.ready) ? playbooks.filter((item)=>item.ready).map((item)=>`${item.label} (${item.trainer_count} fights)`).join(" · ") : (playbooks[0]?.error || "validating routes, battle inputs, Box rules, and recording assets")}</div>}
           <div className="gauntlet-summary">
             <div><strong>{queue.length}</strong>Queued fights</div>
             <div><strong>{form.back_to_back ? "NO" : "YES"}</strong>Healing between</div>
             <div><strong>{result ? pct(result.route_confidence) : verifiedRuns.length}</strong>{result ? "Route confidence" : "Verified runs"}</div>
             <div><strong>{result ? `${result.completed}/${result.queued}` : verifiedRuns.length ? "2×" : "—"}</strong>{result ? "Fights solved" : "Uncut proof"}</div>
           </div>
-          <div className="local-input-strip" aria-label="Local emulator inputs">
-            <label>Local Run & Bun ROM<input value={localForm.rom} onChange={(event) => setLocalForm({ ...localForm, rom: event.target.value })} placeholder="/path/to/your/RunAndBun.gba" /><small>Required only to run new emulator searches. The ROM stays on this computer.</small></label>
-            <label>Starting mGBA checkpoint<input value={localForm.pc_state} onChange={(event) => setLocalForm({ ...localForm, pc_state: event.target.value })} placeholder="/path/to/starting-checkpoint.ss0" /><small>Use the overworld or PC checkpoint that begins the connected route.</small></label>
-          </div>
+          {gameMode === "emerald" && <div className="gauntlet-rule-strip"><strong>{(form.ruleset || "hardcore-nuzlocke").replaceAll("-", " ")}</strong><span>{form.items_in_battle ? "Battle items allowed" : "No items in battle"}</span><span>{form.allow_revives ? "Revives allowed" : "No Revives"}</span><span>Zero-first · max {Number(form.max_total_faints ?? 3)} faints</span><span>{(form.healing_mode || "bag").replaceAll("-", " ")} healing</span><span>Hints {form.hint_mode ? "on" : "off"}</span></div>}
+          {gameMode === "emerald" ? <div className="sim-line-record"><strong>ROM-FREE JUDGE RUN</strong> · The opening trainer automatically loads the party and legal Box 1–12 roster decoded from its captured checkpoint.</div> : <div className="local-input-strip" aria-label="Local emulator inputs">
+            <label>Local {gameMode === "emerald" ? "Pokémon Emerald" : "Run & Bun"} ROM<input value={localForm.rom} onChange={(event) => setLocalForm({ ...localForm, rom: event.target.value })} placeholder={gameMode === "emerald" ? "/path/to/your/Pokemon Emerald.gba" : "/path/to/your/RunAndBun.gba"} /><small>Required only to run new emulator searches. The ROM stays on this computer.</small></label>
+            <label>Starting save<input value={localForm.pc_state || localForm.state} onChange={(event) => setLocalForm({ ...localForm, pc_state: event.target.value, result_state: "" })} placeholder={gameMode === "emerald" ? "/path/to/Pokemon Emerald.sav or checkpoint.ss0" : "/path/to/starting-checkpoint.ss0"} /><small>{gameMode === "emerald" ? "A .sav is converted automatically. A checkpoint is used directly." : "Use the overworld or PC checkpoint that begins the connected route."}</small></label>
+          </div>}
           {progress && <div className="task-progress-card" role="progressbar" aria-label="Gauntlet route progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(progress.pct || 0)}>
             <div className="task-progress-head"><span>{progress.stage === "cartridge-proof" ? `Cartridge proof: ${progress.completed_replays || 0}/${progress.total_replays || 2} replays · ${progress.video_ready ? "video ready" : "video pending"}` : progress.running ? `Fight ${progress.current || 1} of ${progress.total || queue.length}: ${progress.trainer || "starting"}` : (progress.phase || "complete")}</span><strong>{Math.round(progress.pct || 0)}%</strong></div>
             <div className="task-progress-track"><div className="task-progress-fill" style={{ width: `${Math.max(1, progress.pct || 0)}%` }} /></div>
@@ -4818,22 +5700,26 @@
           {status !== "ready" && <div className={`sim-running-note ${result?.result === "route-stopped" ? "sim-video-error" : ""}`}>{status}</div>}
           {!result ? <div className="empty">Open Configure route to choose the trainer order and whether damage carries forward.</div> : <div className="gauntlet-fights">
             {result.saved_run?.id && <div className="sim-line-record">Permanent route log: <a href={`/api/calc/gauntlet/runs/${encodeURIComponent(result.saved_run.id)}`} target="_blank">open full request, teams, items, turns, and result</a>{result.cache_hit ? " · exact saved route reused" : ""}</div>}
-            {result.proof_complete ? <div className="sim-line-record"><strong>CARTRIDGE VERIFIED</strong> · repeated real-game route replays passed and the approved uncut video is ready.</div> : <div className="sim-video-error">{result.proof_error || "Planner result only: this is not a finished route until repeated game replays and an uncut video pass."}</div>}
-            {(result.videos || []).map((video) => video.video_ready && <div className="sim-video-log" key={video.video_url}><div className="sim-kicker">{video.label}</div><video controls preload="metadata" src={video.video_url} /></div>)}
+            {result.proof_complete ? <div className="sim-line-record"><strong>CARTRIDGE VERIFIED</strong> · {result.emulator_validation?.fixed_deathless_wins || 0}/{result.emulator_validation?.fixed_replays || 0} full routes were deathless{result.emulator_validation?.minimum_player_hp ? `; minimum observed HP was ${result.emulator_validation.minimum_player_hp}` : ""}. The approved uncut videos are ready. The fight cards below are calculator estimates; the cartridge verdict is authoritative.</div> : result.result === "route-complete" ? <div className="sim-line-record"><strong>VIDEO + TEXT SAVED</strong> · The deterministic planner replay and full complementary log were generated together. This is simulator evidence, not a cartridge claim.</div> : <div className="sim-video-error">{result.stopped_reason || "The current party did not produce a complete route. Open the diagnosis below for specific changes."}</div>}
+            <VideoPicker videos={result.videos || []} title="Current route evidence" subtitle="Video replay with complementary saved text" />
             {(result.fights || []).map((fight) => <article className="gauntlet-fight" key={`${fight.position}-${fight.trainer}`}>
               <div className="gauntlet-fight-head"><h3>{fight.position}. {fight.trainer}</h3><span>{fight.result === "win-line" ? "CLEARED" : "ROUTE STOPS"} · {pct(fight.confidence)}</span></div>
               <div className="node-meta">{fight.location} · {fight.is_doubles ? "Double battle" : "Single battle"} · {(fight.turns || []).length} turns</div>
               <div className="gauntlet-hp-grid"><div><b>ENTERED FIGHT</b><GauntletTeamState team={fight.starting_team} /></div><div><b>LEFT FIGHT</b><GauntletTeamState team={fight.ending_team} /></div></div>
+              <PreparationDiagnosis diagnosis={fight.failure_diagnosis} />
+              {fight.nuzlocke_failure && <div className="sim-video-error"><strong>NUZLOCKE LINE REJECTED</strong> · Fainted: {(fight.nuzlocke_failure.fainted || []).join(", ")}. The trainer may be beaten, but this route does not count.</div>}
+              {fight.accepted_sacrifices && <div className="last-resort-disclosure"><strong>BOUNDED SACRIFICE FALLBACK</strong><span>{(fight.accepted_sacrifices.fainted || []).join(", ")} · {fight.accepted_sacrifices.total_faints}/{fight.accepted_sacrifices.max_total_faints} route faint budget used</span><small>Zero-faint lines were ranked first. Fainted Pokémon remain unavailable for every later fight.</small></div>}
               {fight.preparation?.box_visit && <div className="sim-ci">Pokémon Center prep · withdrew {(fight.preparation.chosen || []).join(" · ")}{Object.keys(fight.preparation.held_items || {}).length ? ` · items: ${Object.entries(fight.preparation.held_items).map(([name,item]) => `${name}—${item}`).join(", ")}` : ""}</div>}
+              {(fight.preparation?.leveling || []).length > 0 && <div className="last-resort-disclosure"><strong>LAST-RESORT RARE CANDY USE</strong><span>{fight.preparation.leveling.map((change) => `${change.pokemon}: Lv. ${change.from} → ${change.to}`).join(" · ")}</span><small>The original roster failed first. This change is included in the saved run and video disclosure.</small></div>}
               <details className="sim-replay-details"><summary>Open full turn-by-turn line</summary>{(fight.turns || []).map((turn, index) => <div className="sim-turn-detail" key={`${fight.position}-turn-${turn.turn || index}`}><strong>Turn {turn.turn || index + 1}: {turn.action || turn.plan || turn.answer || "Continue line"}</strong><span>{turn.calc || turn.outcome || ""}</span></div>)}</details>
               {(fight.alternate_answer_lines || []).map((alternate, alternateIndex) => <details className="sim-replay-details" key={`${fight.position}-backup-${alternateIndex}`}><summary>Backup {alternateIndex + 1} · no {alternate.forbidden_answer} · {alternate.status === "winning-alternate" ? "DEATHLESS WIN" : alternate.status === "unsafe-alternate" ? "UNSAFE · DEATH OCCURRED" : "NO CLEAR"}</summary><div className="sim-ci">Different team: {(alternate.team || []).join(" · ") || "none"} · confidence {pct(alternate.confidence)}</div>{(alternate.turns || []).map((turn, index) => <div className="sim-turn-detail" key={`${fight.position}-backup-${alternateIndex}-turn-${turn.turn || index}`}><strong>Turn {turn.turn || index + 1}: {turn.action || turn.answer || "Continue line"}</strong><span>{turn.calc || ""}</span></div>)}</details>)}
             </article>)}
           </div>}
-          {(savedRuns || []).length > 0 && <section className="sim-video-log"><div className="sim-header"><div><h3>Cartridge evidence</h3><div className="sim-subtitle">Verified runs appear first. Each includes the exact log and uncut emulator recording; incomplete experiments remain visible below them.</div></div></div><div className="gauntlet-fights">{savedRuns.slice(0, 12).map((run) => <article className="gauntlet-fight" key={run.id}><div className="gauntlet-fight-head"><h3>{run.created_at ? new Date(run.created_at).toLocaleString() : "Saved evidence"}</h3><span>{run.proof_complete ? "CARTRIDGE VERIFIED" : run.result === "route-complete" ? "PROOF INCOMPLETE" : "CALC STOPPED"} · {run.completed}/{run.queued}</span></div><div className="node-meta">{run.proof_complete ? "The complete connected route passed repeated emulator checks and has an uncut approved video." : (run.proof_error || run.stopped_reason || "Planner result saved; cartridge proof is still required.")}</div>{(run.videos || []).map((video) => video.video_ready && <div key={video.video_url}><div className="sim-kicker">{video.label}</div><video controls preload="metadata" src={video.video_url} /></div>)}{run.emulator_validation && <div className="sim-video-meta"><span>{run.emulator_validation.fixed_deathless_wins}/{run.emulator_validation.fixed_replays} exact deathless replays</span><span>{run.emulator_validation.uncut_route_replays ?? run.emulator_validation.sampled_deathless_wins ?? "—"} uncut route replays</span></div>}<details className="sim-replay-details"><summary>Open full route log</summary><a href={`/api/calc/gauntlet/runs/${encodeURIComponent(run.id)}`} target="_blank">View teams, items, turns, and artifacts</a></details></article>)}</div></section>}
+          {(savedRuns || []).length > 0 && <section className="sim-video-log"><div className="sim-header"><div><h3>{gameMode === "emerald" ? "Saved route logs" : "Cartridge evidence"}</h3><div className="sim-subtitle">Runs are grouped by date. {gameMode === "emerald" ? "Open a day to inspect the planner result; a Watch button appears only when an uncut game replay really exists." : "Open a day, then choose the exact uncut replay you want to watch."}</div></div><div className="sim-count">{savedRuns.length} saved</div></div><EvidenceLibrary runs={savedRuns} kind="gauntlet" /></section>}
         </section>;
       }
 
-      function SimulatorSetupModal({ form, setForm, onClose, onInspect, onCheckpoint, onRun, running, inspectStatus }) {
+      function SimulatorSetupModal({ gameMode, form, setForm, onClose, onInspect, onCheckpoint, onRun, running, inspectStatus }) {
         function startRun() {
           onClose();
           onRun();
@@ -4841,74 +5727,94 @@
         return <div className="gauntlet-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !running) onClose(); }}>
           <section className="gauntlet-modal simulator-modal" role="dialog" aria-modal="true" aria-label="Set up one battle simulation">
             <div className="gauntlet-modal-head">
-              <div><div className="sim-kicker">SIMULATOR · ONE FIGHT</div><h2>Choose how thoroughly to test this fight.</h2><p>The simulator starts from one battle checkpoint, searches for several complete plans at once, then repeats the best plans in the real game.</p></div>
+              <div><div className="sim-kicker">One fight</div><h2>Choose how much testing to do.</h2><p>Start from a battle save. The app tries plans, keeps the useful ones, and then plays them again on the cartridge.</p></div>
               <button onClick={onClose} aria-label="Close simulator setup" disabled={running}>Close</button>
             </div>
 
             <div className="simulator-state-box">
-              <label>Local Run & Bun ROM<input value={form.rom} onChange={(event) => setForm({ ...form, rom: event.target.value })} placeholder="/path/to/your/RunAndBun.gba" /></label>
-              <label>Battle checkpoint<input value={form.state} onChange={(event) => setForm({ ...form, state: event.target.value })} placeholder="Choose the save state immediately before the fight" /></label>
+              <label>Game file<input value={form.rom} onChange={(event) => setForm({ ...form, rom: event.target.value })} placeholder={gameMode === "emerald" ? "/path/to/your/Pokemon Emerald.gba" : "/path/to/your/RunAndBun.gba"} /></label>
+              <label>Save before the fight<input value={form.state} onChange={(event) => setForm({ ...form, state: event.target.value, result_state: "" })} placeholder="Choose a .sav or checkpoint immediately before the fight" /></label>
               <div className="sim-action-row">
-                <button className="ghost" onClick={onInspect} disabled={running}>Check this battle</button>
-                <button className="ghost" onClick={() => onCheckpoint(false)} disabled={running}>Save where the game is now</button>
-                <button className="ghost" onClick={() => onCheckpoint(true)} disabled={running}>Start from the ROM save</button>
+                <button className="ghost" onClick={onInspect} disabled={running}>Read this fight</button>
+                <button className="ghost" onClick={() => onCheckpoint(false)} disabled={running}>Save current position</button>
+                <button className="ghost" onClick={() => onCheckpoint(true)} disabled={running}>Open the Emerald battery save</button>
               </div>
-              <div className="sim-read-status">{inspectStatus === "idle" ? "Check the battle first if you want to confirm the trainer, moves, HP, and party before spending time on a search." : inspectStatus}</div>
+              <div className="sim-read-status">{inspectStatus === "idle" ? "Read the fight first to confirm the trainer, moves, and current HP." : inspectStatus}</div>
+              {form.result_state && <div className="sim-line-record"><strong>Victory checkpoint ready.</strong> Testing again still starts from the original fight. <button className="ghost" onClick={() => setForm({ ...form, state: form.result_state, result_state: "" })}>Continue from victory</button></div>}
             </div>
 
             <div className="simulator-setting-grid" aria-label="Simulation effort">
-              <label><span>Games running together</span><input type="number" min="1" max="16" value={form.instances} onChange={(event) => setForm({ ...form, instances: Number(event.target.value) })} /><small>More games test different choices at the same time. Eight is faster if this Mac has room.</small></label>
-              <label><span>Search matches</span><input type="number" min="4" value={form.iterations} onChange={(event) => setForm({ ...form, iterations: Number(event.target.value) })} /><small>How many candidate battles the search may explore before choosing finalists.</small></label>
-              <label><span>Final plans to keep</span><input type="number" min="1" max="12" value={form.final_line_candidates} onChange={(event) => setForm({ ...form, final_line_candidates: Number(event.target.value) })} /><small>The strongest different plans that move on to real-game proof.</small></label>
-              <label><span>Full replays for each plan</span><input type="number" min="3" max="2000" value={form.final_line_trials} onChange={(event) => setForm({ ...form, final_line_trials: Number(event.target.value) })} /><small>Each finalist is restarted and played this many times. Three is a quick check; 30+ is stronger evidence.</small></label>
+              <label><span>Simulators at once</span><input type="number" min="1" max="16" value={form.instances} onChange={(event) => setForm({ ...form, instances: Number(event.target.value) })} /><small>Four is a good default. Raise this only if the Mac stays responsive.</small></label>
+              <label><span>Plans to try</span><input type="number" min="4" value={form.iterations} onChange={(event) => setForm({ ...form, iterations: Number(event.target.value) })} /><small>More plans take longer. The obvious attack-only plan is always checked first.</small></label>
+              <label><span>Best plans to retest</span><input type="number" min="1" max="12" value={form.final_line_candidates} onChange={(event) => setForm({ ...form, final_line_candidates: Number(event.target.value) })} /><small>Only these plans move on to the slower proof step.</small></label>
+              <label><span>Retests per plan</span><input type="number" min="3" max="2000" value={form.final_line_trials} onChange={(event) => setForm({ ...form, final_line_trials: Number(event.target.value) })} /><small>12 is a useful check. Use 30 or more before risking an important Pokémon.</small></label>
             </div>
 
             <div className="simulator-run-preview">
-              <div><strong>{form.instances}</strong><span>parallel games</span></div>
-              <div><strong>{form.iterations}</strong><span>search matches</span></div>
-              <div><strong>{form.final_line_candidates}</strong><span>final plans</span></div>
-              <div><strong>{Number(form.final_line_trials) * Number(form.final_line_candidates)}</strong><span>proof replays total</span></div>
+              <div><strong>{form.instances}</strong><span>at once</span></div>
+              <div><strong>{form.iterations}</strong><span>plans tried</span></div>
+              <div><strong>{form.final_line_candidates}</strong><span>plans retested</span></div>
+              <div><strong>{Number(form.final_line_trials) * Number(form.final_line_candidates)}</strong><span>maximum retests</span></div>
             </div>
 
             <div className="gauntlet-modal-actions">
-              <div className="node-meta">Nuzlocke rules stay on. A plan is not approved if it needs a faint, a required crit, or a required flinch. Every approved plan receives a full replay and a saved log.</div>
-              <button className="primary" onClick={startRun} disabled={running || !form.state}>{running ? "Testing the fight…" : "Search and replay this fight"}</button>
+              <div className="node-meta">Nuzlocke rules stay on. A plan cannot pass if it needs a faint, crit, or flinch.</div>
+              <button className="primary" onClick={startRun} disabled={running || !form.state}>{running ? "Testing the fight…" : "Test this fight"}</button>
             </div>
           </section>
         </div>;
       }
 
-      function SimulatorView({ trainers, events, snapshot, inspectStatus, validations, form, setForm, onInspect, onCheckpoint, onRun, onKill, running, progress, proofProgress, runLogs }) {
+      function SimulatorStageProgress({ snapshot, running, progress, proofProgress, validationDone, validationTotal }) {
+        const pct = Math.max(0, Math.min(100, Number(proofProgress?.pct || 0)));
+        const current = pct >= 100 ? 4 : pct >= 86 ? 3 : pct >= 35 ? 2 : pct > 0 ? 1 : 0;
+        const rawPhase = String(proofProgress?.phase || "").toLowerCase();
+        const phaseLabel = ({
+          idle: "Ready",
+          starting: "Starting",
+          searching: "Trying plans",
+          validation: "Retesting the best plans",
+          recording: "Recording proof",
+          complete: "Finished",
+        })[rawPhase] || proofProgress?.phase || (running ? "Starting" : "Ready");
+        const stages = [
+          { title: "Read the fight", note: snapshot?.trainer?.name ? `${snapshot.trainer.name} recognized` : "Waiting for a battle save", done: Boolean(snapshot?.trainer?.name) || current > 0 },
+          { title: "Try plans", note: running && progress?.iterations_total ? `${progress.iterations_done || 0} of ${progress.iterations_total} tried` : "The direct attack plan goes first", done: current > 1 },
+          { title: "Retest the best", note: running ? `${validationDone || proofProgress?.completed_replays || 0} of ${validationTotal || proofProgress?.total_replays || 0} replays` : validationDone ? `${validationDone} replays saved` : `${validationTotal} replays planned`, done: current > 2 },
+          { title: "Save proof", note: proofProgress?.video_ready ? "Video and next checkpoint saved" : "Full-speed video is made last", done: current > 3 },
+        ];
+        return <section className="sim-stage-progress" aria-live="polite">
+          <div className="sim-stage-head"><div><span>Progress</span><strong>{phaseLabel}</strong></div><b>{Math.round(pct)}%</b></div>
+          <div className="sim-stage-main-track" role="progressbar" aria-label="Simulator progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(pct)}><i style={{width:`${pct}%`}} /></div>
+          <div className="sim-stage-list">{stages.map((stage, index) => <div className={`${stage.done ? "done" : ""} ${current === index + 1 ? "current" : ""}`} key={stage.title}><span>{stage.done ? "✓" : index + 1}</span><p><strong>{stage.title}</strong><small>{stage.note}</small></p><i><b style={{width:stage.done ? "100%" : current === index + 1 ? `${Math.max(8, (pct % 25) * 4)}%` : "0%"}} /></i></div>)}</div>
+        </section>;
+      }
+
+      function SimulatorView({ gameMode, trainers, events, snapshot, inspectStatus, validations, form, setForm, onInspect, onCheckpoint, onRun, onKill, running, progress, proofProgress, runLogs }) {
         const [showSetup, setShowSetup] = useState(false);
         const validationDone = validations.reduce((sum, line) => sum + (line.trials || 0), 0);
         const validationTotal = Math.max(1, Number(form.final_line_trials) * Number(form.final_line_candidates));
-        const confidencePct = Math.max(0, Math.min(100, Math.round(proofProgress?.pct || 0)));
         return (
           <section className="sim-view" aria-label="Simulator runs">
-            {showSetup && <SimulatorSetupModal form={form} setForm={setForm} onClose={() => setShowSetup(false)} onInspect={onInspect} onCheckpoint={onCheckpoint} onRun={onRun} running={running} inspectStatus={inspectStatus} />}
+            {showSetup && <SimulatorSetupModal gameMode={gameMode} form={form} setForm={setForm} onClose={() => setShowSetup(false)} onInspect={onInspect} onCheckpoint={onCheckpoint} onRun={onRun} running={running} inspectStatus={inspectStatus} />}
             <div className="gauntlet-hero simulator-hero">
-              <div><div className="sim-kicker">ONE-FIGHT SIMULATOR</div><h2>Find the line. Prove it in the game.</h2><p>{snapshot?.trainer?.name ? `${snapshot.trainer.name} is loaded. ` : "Load one battle checkpoint. "}The search runs game copies in parallel, keeps the strongest different plans, and fully replays every finalist.</p></div>
-              <div className="sim-action-row"><button className="ghost" onClick={() => setShowSetup(true)}>Configure test</button><button className="ghost" onClick={onInspect} disabled={running}>Check battle</button><button className="primary" onClick={onRun} disabled={running}>{running ? "Testing in game…" : "Run with these settings"}</button>{running && <button className="ghost danger" onClick={onKill}>Stop</button>}</div>
+              <div><div className="sim-kicker">{gameMode === "emerald" ? "Pokémon Emerald" : "One fight"}</div><h2>Test a fight before you play it.</h2><p>{snapshot?.trainer?.name ? `${snapshot.trainer.name} is ready. ` : "Choose a save immediately before a trainer. "}The app tries the quick attack plan first, searches for safer alternatives when needed, and proves the winner in the game.</p></div>
+              <div className="sim-action-row"><button className="ghost" onClick={() => setShowSetup(true)}>Settings</button><button className="ghost" onClick={onInspect} disabled={running}>Read fight</button><button className="primary" onClick={onRun} disabled={running}>{running ? "Testing…" : "Test fight"}</button>{running && <button className="ghost danger" onClick={onKill}>Stop</button>}</div>
             </div>
             <div className="gauntlet-summary simulator-summary">
-              <div><strong>{form.instances}</strong>Games at once</div>
-              <div><strong>{form.iterations}</strong>Search matches</div>
-              <div><strong>{form.final_line_candidates}</strong>Plans kept</div>
-              <div><strong>{form.final_line_trials}</strong>Replays per plan</div>
+              <div><strong>{form.instances}</strong>simulators at once</div>
+              <div><strong>{form.iterations}</strong>plans to try</div>
+              <div><strong>{form.final_line_candidates}</strong>plans retested</div>
+              <div><strong>{form.final_line_trials}</strong>retests each</div>
             </div>
 
             {snapshot && <BattleFingerprint snapshot={snapshot} />}
 
-            <AutonomyPanel form={form} trainers={trainers} />
+            <AutonomyPanel gameMode={gameMode} form={form} setForm={setForm} trainers={trainers} />
 
             {events.length > 0 && <LiveReplayWall events={events.slice(0, 4)} running={running} />}
 
-            <div className="sim-confidence-head">
-              <div><div className="sim-kicker">CARTRIDGE PROOF</div><h3>{proofProgress?.phase || (validations.length ? `${validationDone} fixed-line replays` : "Waiting for candidate lines")}</h3></div>
-              <div className="sim-confidence-number">{confidencePct}%</div>
-            </div>
-            <div className="sim-confidence-track"><div style={{ width: `${confidencePct}%` }} /></div>
-            <div className="sim-read-status">{Number(proofProgress?.completed_replays || 0)} / {Number(proofProgress?.total_replays || validationTotal)} in-game verification runs · video {proofProgress?.video_ready ? "ready" : "pending"}{proofProgress?.verified ? " · verified" : ""}</div>
+            <SimulatorStageProgress snapshot={snapshot} running={running} progress={progress} proofProgress={proofProgress} validationDone={validationDone} validationTotal={validationTotal} />
             {running && <div className="sim-running-note">{progress?.message || "Exploring routes in parallel…"}</div>}
 
             {validations.length > 0 && (
@@ -4966,25 +5872,7 @@
             <div className="sim-action-row"><span className="sim-count">{runs.length} saved</span><button className="ghost" onClick={openRecordingsFolder}>Open recordings folder</button></div>
           </div>
           {folderStatus && <div className="sim-read-status">{folderStatus}</div>}
-          {runs.length === 0 ? <div className="empty">Finish a simulator run and its video, result, route, and final HP will stay here after refresh.</div> : (
-            <div className="sim-video-grid">
-              {runs.slice(0, 12).map((run) => <article className="sim-video-card" key={run.id}>
-                <div className="sim-line-card-head"><span>{new Date(run.created_at).toLocaleString()}</span><strong>{run.proof_complete ? "CARTRIDGE VERIFIED" : run.strategy_status === "team_change_required" ? "TEAM CHANGE REQUIRED" : run.strategy_status === "conditionally_approved" ? "CRIT PIVOT READY" : "PROOF INCOMPLETE"}</strong></div>
-                <div className="sim-line-record">{run.trainer}</div>
-                {run.comparison ? <div className="sim-video-grid">
-                  <div><div className="sim-kicker">A — ORIGINAL TEAM</div><div className="sim-ci">{(run.comparison.original_team || []).join(" · ")}</div><video controls preload="metadata" src={run.comparison.original_video_url} /></div>
-                  <div><div className="sim-kicker">B — APPROVED TEAM</div><div className="sim-ci">{(run.comparison.approved_team || []).join(" · ")}</div><video controls preload="metadata" src={run.comparison.approved_video_url} /></div>
-                </div> : (run.videos || []).length ? <div className="sim-video-grid">{run.videos.map((video) => <div key={`${run.id}-${video.kind}`}><div className="sim-kicker">{video.label}</div>{video.video_ready ? <video controls preload="metadata" src={video.video_url} /> : <div className="sim-screen-missing">Video unavailable</div>}</div>)}</div>
-                  : run.video_ready ? <video controls preload="metadata" src={run.video_url} /> : <div className="sim-screen-missing">Video unavailable</div>}
-                <div className="sim-video-meta"><span>{run.turn_count || 0} turns</span><span>{run.player_faints || 0} faints</span><span>Final HP {compactHp(run.final_player_hp)}</span><span>Normal clears {pct(run.normal_clear_rate)} over {run.confidence_replays || 0} replays</span></div>
-                {run.strategy_status === "conditionally_approved" && <div className="sim-line-record">The base route passed normally; an exact saved crit-like branch was re-solved into a separate no-faint pivot. Open the split replay above.</div>}
-                {run.strategy_status === "team_change_required" && <div className="sim-video-error">This route was not consistent without lucky outcomes. Change the team in Prepare and solve again.</div>}
-                {!run.proof_complete && run.strategy_status !== "team_change_required" && <div className="sim-video-error">This planner result is saved for diagnosis, but it is not a finished line until repeated in-game runs and the approved full video both pass.</div>}
-                {run.error && <div className="sim-video-error">{run.error}</div>}
-                <details className="sim-replay-details"><summary>Open full log</summary><a href={`/api/simulator/runs/${encodeURIComponent(run.id)}`} target="_blank">View saved JSON log</a></details>
-              </article>)}
-            </div>
-          )}
+          {runs.length === 0 ? <div className="empty">Finish a simulator run and its video, result, route, and final HP will stay here after refresh.</div> : <EvidenceLibrary runs={runs} kind="simulator" />}
         </section>;
       }
 
@@ -5010,18 +5898,20 @@
       function LiveReplayWall({ events, running }) {
         const [tick, setTick] = useState(0);
         useEffect(() => {
+          if (!running) return undefined;
           const timer = setInterval(() => setTick((value) => value + 1), 900);
           return () => clearInterval(timer);
-        }, []);
+        }, [running]);
+        useEffect(() => { setTick(0); }, [events.length, running]);
         return <div style={{margin:"14px 0"}}>
-          <div className="sim-header"><div><h3>{running ? "Games playing now" : "Latest GBA replays"}</h3><div className="sim-subtitle">Every card advances through the actual captured game frames and named actions.</div></div></div>
+          <div className="sim-header"><div><h3>{running ? "Games playing now" : "Latest GBA replays"}</h3><div className="sim-subtitle">Each card follows captured game frames, then stops on the last real turn.</div></div></div>
           <div className="sim-line-grid">
             {events.map((event) => {
               const turns = event.turns || [];
-              const index = turns.length ? tick % turns.length : 0;
+              const index = turns.length ? (running ? Math.min(tick, turns.length - 1) : turns.length - 1) : 0;
               const turn = turns[index] || {};
               return <article className="sim-line-card" key={`live-${event.trial_id}-${event.instance_id}`}>
-                <div className="sim-line-card-head"><span>GAME {event.instance_id + 1} · TURN {turn.turn || 0}</span><strong>{event.status}</strong></div>
+                <div className="sim-line-card-head"><span>GAME {event.instance_id + 1} · TURN {turn.turn || 0}</span><strong>{event.status === "WIN" ? "Finished" : event.status}</strong></div>
                 <GameScreen screen={turn.screen || event.screen} className="sim-fingerprint-screen" />
                 <div className="sim-line-record">{(turn.actions || []).join(" + ") || event.reason}</div>
                 <div className="sim-ci">Your HP {compactHp(turn.player_hp || event.player_hp)} · Enemy HP {compactHp(turn.enemy_hp || event.enemy_hp)}</div>
@@ -5031,8 +5921,8 @@
         </div>;
       }
 
-      function AutonomyPanel({ form, trainers }) {
-        const [trainerId, setTrainerId] = useState(48);
+      function AutonomyPanel({ gameMode, form, setForm, trainers }) {
+        const [trainerId, setTrainerId] = useState(gameMode === "emerald" ? 1 : 48);
         const [routeRun, setRouteRun] = useState(null);
         const [routeStatus, setRouteStatus] = useState("ready");
         const [routeLogs, setRouteLogs] = useState([]);
@@ -5046,7 +5936,7 @@
         }, [trainers]);
         const selectedDestination = (trainers || []).find((trainer)=>Number(trainer.id) === Number(trainerId));
         async function runRoute(kind) {
-          const overworldState = form.pc_state || form.state;
+          const overworldState = form.state || form.pc_state;
           const actions = kind === "bag" ? [{kind:"open_bag"}]
             : [];
           const selectedTrainer = (trainers || []).find((trainer)=>trainer.id === Number(trainerId));
@@ -5054,25 +5944,28 @@
           try {
             const response = await fetch("/api/autonomy/route", {
               method:"POST", headers:{"Content-Type":"application/json"},
-              body:JSON.stringify({rom:form.rom,state:overworldState,route_name:kind === "bag" ? "open bag" : kind === "trainer" ? `go to trainer ${trainerId}` : "safe checkpoint",trainer_id:kind === "trainer" ? Number(trainerId) : null,actions,checkpoint_every:1}),
+              body:JSON.stringify({rom:form.rom,state:overworldState,route_name:kind === "bag" ? "open bag" : kind === "trainer" ? `go to trainer ${trainerId}` : "safe checkpoint",trainer_id:kind === "trainer" ? Number(trainerId) : null,actions,checkpoint_every:1,game_mode:gameMode === "emerald" ? "pokemon-emerald" : "run-and-bun"}),
             });
             if (!response.ok) throw new Error(await response.text());
             const data = await response.json();
             setRouteRun(data);
+            if (kind === "trainer" && data.checkpoints?.length) {
+              setForm((current) => ({...current, state:data.checkpoints[data.checkpoints.length - 1]}));
+            }
             setRouteStatus(data.status === "complete" ? "Route completed and checkpointed" : data.status);
             loadRouteLogs();
           } catch (error) { setRouteStatus(`Route stopped safely: ${error}`); }
         }
         return <section className="sim-fingerprint" style={{marginTop:14}}>
-          <div className="sim-fingerprint-title"><span className="sim-signal">ONE FIGHT</span><div><strong>Go straight to a trainer</strong><span>Simulator handles one selected battle. It checkpoints travel and keeps a permanent movement log; use Gauntlet for successive trainers.</span></div></div>
+          <div className="sim-fingerprint-title"><span className="sim-signal">TRAVEL</span><div><strong>Walk to the fight</strong><span>Choose one trainer. The app saves the route so you can resume if movement stops.</span></div></div>
           <div className="simulator-trainer-picker">
             <TrainerDropdown trainers={trainers} value={trainerId} onChange={setTrainerId} label="Go straight to which trainer?" />
             <div className="trainer-search-count">{selectedDestination ? `Selected destination: ${selectedDestination.label}` : "Choose a trainer destination."}</div>
           </div>
           <div className="sim-action-row">
-            <button className="ghost" onClick={()=>runRoute("checkpoint")}>Save safe checkpoint</button>
-            <button className="ghost" onClick={()=>runRoute("bag")}>Test opening bag</button>
-            <button className="ghost" onClick={()=>runRoute("trainer")}>Go to trainer</button>
+            <button className="ghost" onClick={()=>runRoute("checkpoint")}>Save this position</button>
+            <button className="ghost" onClick={()=>runRoute("bag")}>Open the bag</button>
+            <button className="ghost" onClick={()=>runRoute("trainer")}>Walk to trainer</button>
           </div>
           <div className="sim-read-status">{routeStatus}</div>
           {routeRun && <div className="sim-versus" style={{marginTop:10}}><GameScreen screen={routeRun.screen} className="sim-fingerprint-screen" /><div className="sim-combatant"><span>LAST POSITION</span><strong>{(routeRun.position || []).join(", ")}</strong><em>{routeRun.checkpoints?.length || 0} resumable checkpoints · {routeRun.events?.length || 0} actions logged</em></div></div>}
@@ -5083,15 +5976,21 @@
       function ValidationCard({ line, rank }) {
         const crit = line.critical_analysis || {};
         const diversions = crit.material_diversions || [];
+        const route = line.line || [];
+        const oneMovePlan = route.length > 1 && route.every((step) => step === route[0]);
+        const preview = oneMovePlan
+          ? [`Repeat ${route[0]} until the battle ends`]
+          : route.length <= 6 ? route : [...route.slice(0, 3), "…", ...route.slice(-2)];
         return (
           <article className={`sim-line-card ${rank === 1 ? "best" : ""}`}>
-            <div className="sim-line-card-head"><span>{rank === 1 ? "BEST OBSERVED" : `CANDIDATE ${rank}`}</span><strong>{pct(line.clear_rate)}</strong></div>
-            <div className="sim-line-record">{line.wins || 0} clears · {line.losses || 0} blackouts · {line.incomplete || 0} unfinished · {line.errors || 0} errors</div>
-            <div className="sim-ci">Likely clear range {pct(line.confidence_low)}–{pct(line.confidence_high)} · faint risk {pct(line.faint_rate)}</div>
-            <div className={`sim-line-record ${crit.critical_safe ? "" : "sim-video-error"}`}>{crit.critical_safe ? "Observed crit-like branches stayed deathless" : "BANKED: an observed damage spike broke this line"} · {diversions.length} material diversions</div>
+            <div className="sim-line-card-head"><span>{rank === 1 ? "BEST PLAN" : `ALTERNATIVE ${rank}`}</span><strong>{pct(line.clear_rate)}</strong></div>
+            <div className="sim-line-record">{line.wins || 0} of {line.trials || 0} tests cleared · {line.losses || 0} blackouts · {line.incomplete || 0} unfinished</div>
+            <div className="sim-ci">Expected clear range {pct(line.confidence_low)}–{pct(line.confidence_high)} · faint risk {pct(line.faint_rate)}</div>
+            <div className={`sim-line-record ${crit.critical_safe ? "" : "sim-video-error"}`}>{crit.critical_safe ? "Damage spikes seen in testing stayed safe" : "Set aside: a damage spike broke this plan"} · {diversions.length} useful backup branches</div>
             {diversions.slice(0, 2).map((event, index) => <div className="sim-ci" key={`crit-diversion-${event.turn}-${index}`}>Turn {event.turn} · {event.side === "player" ? "your crit changed the sendout" : "enemy damage spike changed your state"}{event.continuation?.length ? ` · then ${event.continuation[0]}` : ""}</div>)}
-            <ol>{(line.line || []).slice(0, 8).map((step, index) => <li key={`${step}-${index}`}>{step}</li>)}</ol>
-            {(line.line || []).length > 8 && <div className="sim-muted">+ {(line.line || []).length - 8} more turns</div>}
+            <div className="sim-ci">The replay stops on the real KO. A final move may repeat when a lower damage roll needs it.</div>
+            <ol>{preview.map((step, index) => <li key={`${step}-${index}`}>{step}</li>)}</ol>
+            {route.length > 6 && <details className="sim-replay-details"><summary>Show every turn</summary><ol>{route.map((step, index) => <li key={`full-${step}-${index}`}>{step}</li>)}</ol></details>}
           </article>
         );
       }

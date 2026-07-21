@@ -365,6 +365,13 @@ def build_stateful_turn_plan(
     while turn <= max_turns and active_index is not None and any(enemy.alive for enemy in enemies):
         enemy = enemies[enemy_index]
         active = team[active_index]
+        # A zero sleep counter means the battler wakes before choices are made.
+        # Keeping the stale status until action resolution made planners believe
+        # an awake opponent was still disabled and miss legal re-sleep lines.
+        if enemy.status == "sleep" and enemy.sleep_turns <= 0:
+            enemy.status = None
+        if active.status == "sleep" and active.sleep_turns <= 0:
+            active.status = None
         if _planner_is_stalled(team, enemy, calculator):
             turns.append(
                 _turn_dict(
@@ -541,7 +548,7 @@ def build_stateful_turn_plan(
         confidence *= _ai_branch_confidence(choices, active, enemy, calculator)
 
         enemy_first = _enemy_moves_before_player(enemy, active, enemy_choice.move_name if enemy_choice else "", action.move_name, calculator)
-        if enemy_first and _choice_kills_current(enemy_choice, active):
+        if enemy_first and not _will_skip_turn(enemy) and _choice_kills_current(enemy_choice, active):
             turns.append(
                 _turn_dict(
                     turn,
@@ -644,6 +651,10 @@ def recommend_held_items(
     limit: int = 6,
 ) -> list[dict[str, Any]]:
     pool = _available_held_items(section, available_items)
+    if calculator.game_mode == "pokemon-emerald":
+        # Never suggest a post-Gen-III item in Emerald mode.  Explicit imported
+        # inventory is still accepted below, but the built-in pool is generation-safe.
+        pool = {item for item in pool if _normalize(item) in calculator.items}
     unavailable_ids = {_normalize(item) for item in (unavailable_items or ())}
     pool = {item for item in pool if _normalize(item) not in unavailable_ids}
     for member in team:
@@ -680,7 +691,11 @@ def recommend_held_items(
                 "suggested_item": item,
                 "score": round(score, 1),
                 "reason": reason,
-                "source": HELD_ITEM_LOCATIONS.get(item_id, "Available held-item pool for this split"),
+                "source": (
+                    "Pokémon Emerald held-item pool (must be present in the current bag)"
+                    if calculator.game_mode == "pokemon-emerald"
+                    else HELD_ITEM_LOCATIONS.get(item_id, "Available held-item pool for this split")
+                ),
             }
         )
         used_members.add(member_index)
@@ -1158,6 +1173,12 @@ def _best_player_action(
                 score += 55.0 + _enemy_pressure(enemy, member, team, calculator) * 35.0
         if damage.max_percent >= 0.5:
             score += 18.0
+        # A reliable attack that removes roughly a third of the target is already
+        # making concrete progress.  Previously, a generic stat drop could outscore
+        # a super-effective 2–3HKO (notably Mudkip's Water Gun into Roxanne's
+        # Nosepass), causing the planner to stall or pivot into a much worse answer.
+        if damage.min_percent >= 1 / 3:
+            score += 25.0
         if damage.accuracy < 1:
             score -= (1.0 - damage.accuracy) * 25.0
         actions.append(PlayerAction("move", damage.move_name, score=score, damage=damage, reason="best damage"))
@@ -1217,16 +1238,29 @@ def _best_player_action(
         elif move_id in CONFUSION_MOVES and enemy.confused_turns <= 0:
             score = 22.0 + enemy_pressure * 15.0
             reason = "confusion adds a disruption chance"
-        elif move_id in ATTACK_DROP_MOVES and _enemy_best_category(enemy, member, calculator) == "Physical":
+        elif (
+            move_id in ATTACK_DROP_MOVES
+            and enemy.boosts.get("atk", 0) > -6
+            and _enemy_best_category(enemy, member, calculator) == "Physical"
+        ):
             score = 38.0 + enemy_pressure * 35.0 + ATTACK_DROP_MOVES[move_id] * 8.0
+            score -= abs(min(0, enemy.boosts.get("atk", 0))) * 24.0
             reason = "attack drop creates a safer pivot"
-        elif move_id in SPECIAL_ATTACK_DROP_MOVES and _enemy_best_category(enemy, member, calculator) == "Special":
+        elif (
+            move_id in SPECIAL_ATTACK_DROP_MOVES
+            and enemy.boosts.get("spa", 0) > -6
+            and _enemy_best_category(enemy, member, calculator) == "Special"
+        ):
             score = 38.0 + enemy_pressure * 35.0 + SPECIAL_ATTACK_DROP_MOVES[move_id] * 8.0
+            score -= abs(min(0, enemy.boosts.get("spa", 0))) * 24.0
             reason = "special attack drop creates a safer pivot"
-        elif move_id in SPEED_DROP_MOVES:
+        elif move_id in SPEED_DROP_MOVES and enemy.boosts.get("spe", 0) > -6:
             score = 34.0 + SPEED_DROP_MOVES[move_id] * 8.0
+            score -= abs(min(0, enemy.boosts.get("spe", 0))) * 18.0
             reason = "speed drop can flip turn order"
-        elif move_id in SETUP_MOVE_BOOSTS:
+        elif move_id in SETUP_MOVE_BOOSTS and any(
+            member.boosts.get(stat, 0) < 6 for stat in SETUP_MOVE_BOOSTS[move_id]
+        ):
             enemy_choices = _ai_move_choices(enemy, member, team, calculator)
             incoming = enemy_choices[0].damage.max_percent if enemy_choices and enemy_choices[0].damage else 0.0
             if incoming < 0.45:
@@ -1285,6 +1319,18 @@ def _ai_move_choices(
         elif move:
             score, reason = _ai_status_score(move_name, enemy, player, team, calculator, partner=partner)
         raw.append(MoveChoice(str(move.get("name", move_name)), score, 0.0, damage, reason))
+    if calculator.game_mode == "pokemon-emerald":
+        # Vanilla Emerald trainers use Gen III battle AI, not Run & Bun's custom
+        # +6/+8 damage-roll scoring table.  Without per-trainer AI flag bytes in the
+        # spreadsheet, branch over every tied best-scoring action and report that
+        # uncertainty instead of inventing Run & Bun probabilities.
+        usable = [choice for choice in raw if choice.score > -10]
+        if not usable:
+            usable = raw
+        top = max((choice.score for choice in usable), default=0.0)
+        winners = [choice for choice in usable if abs(choice.score - top) < 1e-9]
+        chance = 1.0 / max(1, len(winners))
+        return [MoveChoice(choice.move_name, choice.score, chance, choice.damage, f"Emerald AI: {choice.reason}") for choice in winners]
     # RnB does not softmax every legal move. It rolls damage for attacks, awards the
     # highest rolled attack +6 (80%) or +8 (20%), then chooses the highest final score;
     # exact ties are random. Approximate the damage-roll winner analytically, then
@@ -1604,6 +1650,8 @@ def _ai_hard_switch_target(
     incoming_player: PlannedMember,
     calculator: DamageCalculator,
 ) -> int | None:
+    if calculator.game_mode == "pokemon-emerald":
+        return None
     active = enemies[enemy_index]
     if active.trapped:
         return None
@@ -1693,6 +1741,8 @@ def _choose_next_enemy(
 ) -> int:
     """Pick the enemy's post-KO switch-in per the RnB switch-score table: highest
     switch-in score against the player's active mon, ties broken by party order."""
+    if calculator.game_mode == "pokemon-emerald":
+        return next((index for index, enemy in enumerate(enemies) if index != exclude and enemy.alive), 0)
     player = team[active_index] if active_index is not None and 0 <= active_index < len(team) else None
     best_index: int | None = None
     best_score: int | None = None
@@ -2565,7 +2615,24 @@ def _skip_turn(member: PlannedMember | PlannedEnemy) -> bool:
     if member.status == "sleep" and member.sleep_turns > 0:
         member.sleep_turns -= 1
         return True
+    if member.status == "sleep":
+        # The counter reached zero on the previous sleeping turn.  Wake before
+        # acting so a legal status move can put this battler back to sleep later.
+        member.status = None
     return False
+
+
+def _will_skip_turn(member: PlannedMember | PlannedEnemy) -> bool:
+    """Pure check for a guaranteed lost turn.
+
+    Decision code must use this before treating a nominally lethal move as an
+    incoming KO.  Calling ``_skip_turn`` while planning would consume a sleep
+    turn before the battle actually advances.
+    """
+    return bool(
+        member.flinched
+        or (member.status == "sleep" and member.sleep_turns > 0)
+    )
 
 
 def _enemy_moves_before_player(
@@ -2987,8 +3054,9 @@ def _choice_safety(
 
 
 # Crit-rate model ported from the bundled calculator (web/static/rnbcalc/js/crit_rate.js).
-# Stage table is Gen 6+: base 1/16, then +1 stage per high-crit source.
+# Modern stage table; Emerald uses its own Gen III table below.
 _CRIT_STAGE_RATES = (0.0625, 0.125, 0.5, 1.0)
+_EMERALD_CRIT_STAGE_RATES = (0.0625, 0.125, 0.25, 1 / 3, 0.5)
 # Pre-normalized (casefolded, alphanumeric only) so these build at import time without
 # depending on _normalize, which is defined later in the module.
 _HIGH_CRIT_MOVES = {
@@ -3029,7 +3097,8 @@ def crit_rate(attacker, defender, move_name: str, calculator: DamageCalculator) 
         stage += 1
     if getattr(attacker, "focus_energy", False):
         stage += 2
-    return _CRIT_STAGE_RATES[min(stage, len(_CRIT_STAGE_RATES) - 1)]
+    rates = _EMERALD_CRIT_STAGE_RATES if calculator.game_mode == "pokemon-emerald" else _CRIT_STAGE_RATES
+    return rates[min(stage, len(rates) - 1)]
 
 
 def flinch_chance(move_name: str, calculator: DamageCalculator, user=None, target=None) -> float:

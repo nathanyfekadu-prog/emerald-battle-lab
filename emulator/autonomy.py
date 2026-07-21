@@ -15,6 +15,8 @@ from typing import Any
 
 from emulator.mgba_instance import MGBAInstance
 from emulator.overworld import OverworldMover
+from emulator.input_controller import InputController
+from emulator.state_reader import StateReader
 import config
 
 
@@ -117,6 +119,16 @@ class CheckpointedGameRunner:
         elif action.kind == "close_menu":
             for _ in range(max(1, action.count)):
                 self.mover.tap("B", settle_frames=20)
+        elif action.kind == "enter_battle":
+            reader = StateReader(self.instance)
+            controller = InputController(self.instance, reader)
+            for _ in range(max(1, action.count)):
+                if controller._screen_looks_battle_command():
+                    return
+                self.instance.send_input("A", 2)
+                self.instance.advance_frames(max(30, action.settle_frames))
+            if not controller._screen_looks_battle_command():
+                raise RuntimeError("Trainer was reached, but the battle command menu did not appear.")
         elif action.kind != "checkpoint":
             raise ValueError(f"Unknown route action {action.kind!r}")
 

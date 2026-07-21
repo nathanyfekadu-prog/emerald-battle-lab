@@ -1,0 +1,576 @@
+{
+  "AbandonedShip_Corridors_1F": {
+    "image": "/static/emerald-maps/AbandonedShip_Corridors_1F.png",
+    "width": 18,
+    "height": 12,
+    "pixel_width": 288,
+    "pixel_height": 192
+  },
+  "AbandonedShip_Corridors_B1F": {
+    "image": "/static/emerald-maps/AbandonedShip_Corridors_B1F.png",
+    "width": 13,
+    "height": 10,
+    "pixel_width": 208,
+    "pixel_height": 160
+  },
+  "AbandonedShip_Rooms2_1F": {
+    "image": "/static/emerald-maps/AbandonedShip_Rooms2_1F.png",
+    "width": 9,
+    "height": 17,
+    "pixel_width": 144,
+    "pixel_height": 272
+  },
+  "AbandonedShip_Rooms_1F": {
+    "image": "/static/emerald-maps/AbandonedShip_Rooms_1F.png",
+    "width": 18,
+    "height": 17,
+    "pixel_width": 288,
+    "pixel_height": 272
+  },
+  "AquaHideout_1F": {
+    "image": "/static/emerald-maps/AquaHideout_1F.png",
+    "width": 28,
+    "height": 30,
+    "pixel_width": 448,
+    "pixel_height": 480
+  },
+  "AquaHideout_B2F": {
+    "image": "/static/emerald-maps/AquaHideout_B2F.png",
+    "width": 34,
+    "height": 24,
+    "pixel_width": 544,
+    "pixel_height": 384
+  },
+  "DewfordTown_Gym": {
+    "image": "/static/emerald-maps/DewfordTown_Gym.png",
+    "width": 18,
+    "height": 28,
+    "pixel_width": 288,
+    "pixel_height": 448
+  },
+  "EverGrandeCity_DrakesRoom": {
+    "image": "/static/emerald-maps/EverGrandeCity_DrakesRoom.png",
+    "width": 13,
+    "height": 14,
+    "pixel_width": 208,
+    "pixel_height": 224
+  },
+  "EverGrandeCity_GlaciasRoom": {
+    "image": "/static/emerald-maps/EverGrandeCity_GlaciasRoom.png",
+    "width": 13,
+    "height": 14,
+    "pixel_width": 208,
+    "pixel_height": 224
+  },
+  "EverGrandeCity_PhoebesRoom": {
+    "image": "/static/emerald-maps/EverGrandeCity_PhoebesRoom.png",
+    "width": 13,
+    "height": 14,
+    "pixel_width": 208,
+    "pixel_height": 224
+  },
+  "EverGrandeCity_SidneysRoom": {
+    "image": "/static/emerald-maps/EverGrandeCity_SidneysRoom.png",
+    "width": 13,
+    "height": 14,
+    "pixel_width": 208,
+    "pixel_height": 224
+  },
+  "FortreeCity_Gym": {
+    "image": "/static/emerald-maps/FortreeCity_Gym.png",
+    "width": 20,
+    "height": 25,
+    "pixel_width": 320,
+    "pixel_height": 400
+  },
+  "JaggedPass": {
+    "image": "/static/emerald-maps/JaggedPass.png",
+    "width": 30,
+    "height": 46,
+    "pixel_width": 480,
+    "pixel_height": 736
+  },
+  "LavaridgeTown_Gym_1F": {
+    "image": "/static/emerald-maps/LavaridgeTown_Gym_1F.png",
+    "width": 17,
+    "height": 19,
+    "pixel_width": 272,
+    "pixel_height": 304
+  },
+  "MagmaHideout_1F": {
+    "image": "/static/emerald-maps/MagmaHideout_1F.png",
+    "width": 37,
+    "height": 38,
+    "pixel_width": 592,
+    "pixel_height": 608
+  },
+  "MagmaHideout_4F": {
+    "image": "/static/emerald-maps/MagmaHideout_4F.png",
+    "width": 59,
+    "height": 28,
+    "pixel_width": 944,
+    "pixel_height": 448
+  },
+  "MauvilleCity_Gym": {
+    "image": "/static/emerald-maps/MauvilleCity_Gym.png",
+    "width": 10,
+    "height": 21,
+    "pixel_width": 160,
+    "pixel_height": 336
+  },
+  "MeteorFalls_1F_2R": {
+    "image": "/static/emerald-maps/MeteorFalls_1F_2R.png",
+    "width": 30,
+    "height": 32,
+    "pixel_width": 480,
+    "pixel_height": 512
+  },
+  "MeteorFalls_StevensCave": {
+    "image": "/static/emerald-maps/MeteorFalls_StevensCave.png",
+    "width": 30,
+    "height": 32,
+    "pixel_width": 480,
+    "pixel_height": 512
+  },
+  "MossdeepCity_Gym": {
+    "image": "/static/emerald-maps/MossdeepCity_Gym.png",
+    "width": 26,
+    "height": 36,
+    "pixel_width": 416,
+    "pixel_height": 576
+  },
+  "MossdeepCity_SpaceCenter_1F": {
+    "image": "/static/emerald-maps/MossdeepCity_SpaceCenter_1F.png",
+    "width": 16,
+    "height": 10,
+    "pixel_width": 256,
+    "pixel_height": 160
+  },
+  "MtChimney": {
+    "image": "/static/emerald-maps/MtChimney.png",
+    "width": 40,
+    "height": 47,
+    "pixel_width": 640,
+    "pixel_height": 752
+  },
+  "MtPyre_2F": {
+    "image": "/static/emerald-maps/MtPyre_2F.png",
+    "width": 13,
+    "height": 13,
+    "pixel_width": 208,
+    "pixel_height": 208
+  },
+  "MtPyre_3F": {
+    "image": "/static/emerald-maps/MtPyre_3F.png",
+    "width": 13,
+    "height": 13,
+    "pixel_width": 208,
+    "pixel_height": 208
+  },
+  "MtPyre_6F": {
+    "image": "/static/emerald-maps/MtPyre_6F.png",
+    "width": 13,
+    "height": 13,
+    "pixel_width": 208,
+    "pixel_height": 208
+  },
+  "MtPyre_Summit": {
+    "image": "/static/emerald-maps/MtPyre_Summit.png",
+    "width": 50,
+    "height": 37,
+    "pixel_width": 800,
+    "pixel_height": 592
+  },
+  "PetalburgCity_Gym": {
+    "image": "/static/emerald-maps/PetalburgCity_Gym.png",
+    "width": 9,
+    "height": 112,
+    "pixel_width": 144,
+    "pixel_height": 1792
+  },
+  "PetalburgWoods": {
+    "image": "/static/emerald-maps/PetalburgWoods.png",
+    "width": 48,
+    "height": 44,
+    "pixel_width": 768,
+    "pixel_height": 704
+  },
+  "Route102": {
+    "image": "/static/emerald-maps/Route102.png",
+    "width": 50,
+    "height": 20,
+    "pixel_width": 800,
+    "pixel_height": 320
+  },
+  "Route103": {
+    "image": "/static/emerald-maps/Route103.png",
+    "width": 80,
+    "height": 22,
+    "pixel_width": 1280,
+    "pixel_height": 352
+  },
+  "Route104": {
+    "image": "/static/emerald-maps/Route104.png",
+    "width": 40,
+    "height": 80,
+    "pixel_width": 640,
+    "pixel_height": 1280
+  },
+  "Route105": {
+    "image": "/static/emerald-maps/Route105.png",
+    "width": 40,
+    "height": 80,
+    "pixel_width": 640,
+    "pixel_height": 1280
+  },
+  "Route106": {
+    "image": "/static/emerald-maps/Route106.png",
+    "width": 80,
+    "height": 20,
+    "pixel_width": 1280,
+    "pixel_height": 320
+  },
+  "Route107": {
+    "image": "/static/emerald-maps/Route107.png",
+    "width": 60,
+    "height": 20,
+    "pixel_width": 960,
+    "pixel_height": 320
+  },
+  "Route108": {
+    "image": "/static/emerald-maps/Route108.png",
+    "width": 60,
+    "height": 20,
+    "pixel_width": 960,
+    "pixel_height": 320
+  },
+  "Route109": {
+    "image": "/static/emerald-maps/Route109.png",
+    "width": 40,
+    "height": 63,
+    "pixel_width": 640,
+    "pixel_height": 1008
+  },
+  "Route109_SeashoreHouse": {
+    "image": "/static/emerald-maps/Route109_SeashoreHouse.png",
+    "width": 15,
+    "height": 10,
+    "pixel_width": 240,
+    "pixel_height": 160
+  },
+  "Route110": {
+    "image": "/static/emerald-maps/Route110.png",
+    "width": 40,
+    "height": 100,
+    "pixel_width": 640,
+    "pixel_height": 1600
+  },
+  "Route110_TrickHousePuzzle1": {
+    "image": "/static/emerald-maps/Route110_TrickHousePuzzle1.png",
+    "width": 15,
+    "height": 22,
+    "pixel_width": 240,
+    "pixel_height": 352
+  },
+  "Route110_TrickHousePuzzle2": {
+    "image": "/static/emerald-maps/Route110_TrickHousePuzzle2.png",
+    "width": 15,
+    "height": 22,
+    "pixel_width": 240,
+    "pixel_height": 352
+  },
+  "Route110_TrickHousePuzzle3": {
+    "image": "/static/emerald-maps/Route110_TrickHousePuzzle3.png",
+    "width": 15,
+    "height": 22,
+    "pixel_width": 240,
+    "pixel_height": 352
+  },
+  "Route110_TrickHousePuzzle4": {
+    "image": "/static/emerald-maps/Route110_TrickHousePuzzle4.png",
+    "width": 15,
+    "height": 22,
+    "pixel_width": 240,
+    "pixel_height": 352
+  },
+  "Route110_TrickHousePuzzle6": {
+    "image": "/static/emerald-maps/Route110_TrickHousePuzzle6.png",
+    "width": 15,
+    "height": 22,
+    "pixel_width": 240,
+    "pixel_height": 352
+  },
+  "Route110_TrickHousePuzzle7": {
+    "image": "/static/emerald-maps/Route110_TrickHousePuzzle7.png",
+    "width": 15,
+    "height": 22,
+    "pixel_width": 240,
+    "pixel_height": 352
+  },
+  "Route110_TrickHousePuzzle8": {
+    "image": "/static/emerald-maps/Route110_TrickHousePuzzle8.png",
+    "width": 15,
+    "height": 22,
+    "pixel_width": 240,
+    "pixel_height": 352
+  },
+  "Route111": {
+    "image": "/static/emerald-maps/Route111.png",
+    "width": 40,
+    "height": 140,
+    "pixel_width": 640,
+    "pixel_height": 2240
+  },
+  "Route112": {
+    "image": "/static/emerald-maps/Route112.png",
+    "width": 40,
+    "height": 60,
+    "pixel_width": 640,
+    "pixel_height": 960
+  },
+  "Route113": {
+    "image": "/static/emerald-maps/Route113.png",
+    "width": 100,
+    "height": 20,
+    "pixel_width": 1600,
+    "pixel_height": 320
+  },
+  "Route114": {
+    "image": "/static/emerald-maps/Route114.png",
+    "width": 40,
+    "height": 80,
+    "pixel_width": 640,
+    "pixel_height": 1280
+  },
+  "Route115": {
+    "image": "/static/emerald-maps/Route115.png",
+    "width": 40,
+    "height": 80,
+    "pixel_width": 640,
+    "pixel_height": 1280
+  },
+  "Route116": {
+    "image": "/static/emerald-maps/Route116.png",
+    "width": 100,
+    "height": 20,
+    "pixel_width": 1600,
+    "pixel_height": 320
+  },
+  "Route117": {
+    "image": "/static/emerald-maps/Route117.png",
+    "width": 60,
+    "height": 20,
+    "pixel_width": 960,
+    "pixel_height": 320
+  },
+  "Route118": {
+    "image": "/static/emerald-maps/Route118.png",
+    "width": 80,
+    "height": 20,
+    "pixel_width": 1280,
+    "pixel_height": 320
+  },
+  "Route119": {
+    "image": "/static/emerald-maps/Route119.png",
+    "width": 40,
+    "height": 140,
+    "pixel_width": 640,
+    "pixel_height": 2240
+  },
+  "Route119_WeatherInstitute_1F": {
+    "image": "/static/emerald-maps/Route119_WeatherInstitute_1F.png",
+    "width": 20,
+    "height": 13,
+    "pixel_width": 320,
+    "pixel_height": 208
+  },
+  "Route119_WeatherInstitute_2F": {
+    "image": "/static/emerald-maps/Route119_WeatherInstitute_2F.png",
+    "width": 20,
+    "height": 11,
+    "pixel_width": 320,
+    "pixel_height": 176
+  },
+  "Route120": {
+    "image": "/static/emerald-maps/Route120.png",
+    "width": 40,
+    "height": 100,
+    "pixel_width": 640,
+    "pixel_height": 1600
+  },
+  "Route121": {
+    "image": "/static/emerald-maps/Route121.png",
+    "width": 80,
+    "height": 20,
+    "pixel_width": 1280,
+    "pixel_height": 320
+  },
+  "Route123": {
+    "image": "/static/emerald-maps/Route123.png",
+    "width": 140,
+    "height": 20,
+    "pixel_width": 2240,
+    "pixel_height": 320
+  },
+  "Route124": {
+    "image": "/static/emerald-maps/Route124.png",
+    "width": 80,
+    "height": 80,
+    "pixel_width": 1280,
+    "pixel_height": 1280
+  },
+  "Route125": {
+    "image": "/static/emerald-maps/Route125.png",
+    "width": 80,
+    "height": 40,
+    "pixel_width": 1280,
+    "pixel_height": 640
+  },
+  "Route126": {
+    "image": "/static/emerald-maps/Route126.png",
+    "width": 80,
+    "height": 80,
+    "pixel_width": 1280,
+    "pixel_height": 1280
+  },
+  "Route127": {
+    "image": "/static/emerald-maps/Route127.png",
+    "width": 80,
+    "height": 80,
+    "pixel_width": 1280,
+    "pixel_height": 1280
+  },
+  "Route128": {
+    "image": "/static/emerald-maps/Route128.png",
+    "width": 120,
+    "height": 40,
+    "pixel_width": 1920,
+    "pixel_height": 640
+  },
+  "Route129": {
+    "image": "/static/emerald-maps/Route129.png",
+    "width": 80,
+    "height": 40,
+    "pixel_width": 1280,
+    "pixel_height": 640
+  },
+  "Route130": {
+    "image": "/static/emerald-maps/Route130.png",
+    "width": 80,
+    "height": 40,
+    "pixel_width": 1280,
+    "pixel_height": 640
+  },
+  "Route131": {
+    "image": "/static/emerald-maps/Route131.png",
+    "width": 60,
+    "height": 40,
+    "pixel_width": 960,
+    "pixel_height": 640
+  },
+  "Route132": {
+    "image": "/static/emerald-maps/Route132.png",
+    "width": 80,
+    "height": 40,
+    "pixel_width": 1280,
+    "pixel_height": 640
+  },
+  "Route133": {
+    "image": "/static/emerald-maps/Route133.png",
+    "width": 80,
+    "height": 40,
+    "pixel_width": 1280,
+    "pixel_height": 640
+  },
+  "Route134": {
+    "image": "/static/emerald-maps/Route134.png",
+    "width": 80,
+    "height": 40,
+    "pixel_width": 1280,
+    "pixel_height": 640
+  },
+  "RustboroCity_Gym": {
+    "image": "/static/emerald-maps/RustboroCity_Gym.png",
+    "width": 11,
+    "height": 20,
+    "pixel_width": 176,
+    "pixel_height": 320
+  },
+  "RusturfTunnel": {
+    "image": "/static/emerald-maps/RusturfTunnel.png",
+    "width": 36,
+    "height": 24,
+    "pixel_width": 576,
+    "pixel_height": 384
+  },
+  "SSTidalLowerDeck": {
+    "image": "/static/emerald-maps/SSTidalLowerDeck.png",
+    "width": 17,
+    "height": 13,
+    "pixel_width": 272,
+    "pixel_height": 208
+  },
+  "SSTidalRooms": {
+    "image": "/static/emerald-maps/SSTidalRooms.png",
+    "width": 36,
+    "height": 18,
+    "pixel_width": 576,
+    "pixel_height": 288
+  },
+  "SeafloorCavern_Room1": {
+    "image": "/static/emerald-maps/SeafloorCavern_Room1.png",
+    "width": 20,
+    "height": 21,
+    "pixel_width": 320,
+    "pixel_height": 336
+  },
+  "SeafloorCavern_Room3": {
+    "image": "/static/emerald-maps/SeafloorCavern_Room3.png",
+    "width": 16,
+    "height": 17,
+    "pixel_width": 256,
+    "pixel_height": 272
+  },
+  "SlateportCity_OceanicMuseum_2F": {
+    "image": "/static/emerald-maps/SlateportCity_OceanicMuseum_2F.png",
+    "width": 20,
+    "height": 9,
+    "pixel_width": 320,
+    "pixel_height": 144
+  },
+  "SootopolisCity_Gym_1F": {
+    "image": "/static/emerald-maps/SootopolisCity_Gym_1F.png",
+    "width": 17,
+    "height": 26,
+    "pixel_width": 272,
+    "pixel_height": 416
+  },
+  "SootopolisCity_Gym_B1F": {
+    "image": "/static/emerald-maps/SootopolisCity_Gym_B1F.png",
+    "width": 17,
+    "height": 26,
+    "pixel_width": 272,
+    "pixel_height": 416
+  },
+  "VictoryRoad_1F": {
+    "image": "/static/emerald-maps/VictoryRoad_1F.png",
+    "width": 46,
+    "height": 45,
+    "pixel_width": 736,
+    "pixel_height": 720
+  },
+  "VictoryRoad_B1F": {
+    "image": "/static/emerald-maps/VictoryRoad_B1F.png",
+    "width": 46,
+    "height": 31,
+    "pixel_width": 736,
+    "pixel_height": 496
+  },
+  "VictoryRoad_B2F": {
+    "image": "/static/emerald-maps/VictoryRoad_B2F.png",
+    "width": 46,
+    "height": 31,
+    "pixel_width": 736,
+    "pixel_height": 496
+  }
+}

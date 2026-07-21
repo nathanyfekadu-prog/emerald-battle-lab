@@ -102,6 +102,45 @@ def test_run_bun_battle_struct_reads_both_move_sets_and_active_slots() -> None:
     assert state.player_move_names_by_slot[1][:2] == ["Mud Shot", "Bite"]
 
 
+def test_emerald_reads_exact_party_index_for_duplicate_enemy_species() -> None:
+    """The second of two Wurmple must not be mistaken for party slot zero."""
+    reader = object.__new__(StateReader)
+    reader.instance = FakeInstance({
+        state_reader_module._EMERALD_BATTLER_PARTY_INDEXES_ADDRESS: 0,
+        state_reader_module._EMERALD_BATTLER_PARTY_INDEXES_ADDRESS + 2: 1,
+    })
+    reader._vanilla_emerald = True
+    reader._battler_party_indexes_address = state_reader_module._EMERALD_BATTLER_PARTY_INDEXES_ADDRESS
+
+    assert state_reader_module._EMERALD_BATTLER_PARTY_INDEXES_ADDRESS == 0x0202406E
+    assert reader._read_active_party_slots((0, 1)) == (0, 1)
+
+
+def test_party_hp_pair_uses_one_exact_block_snapshot() -> None:
+    class BlockInstance(FakeInstance):
+        def __init__(self) -> None:
+            super().__init__({})
+            self.block_reads = 0
+
+        def read_block(self, address: int, length: int) -> bytes:
+            self.block_reads += 1
+            raw = bytearray(length)
+            for slot in range(6):
+                start = slot * 100
+                raw[start + 0x38:start + 0x3A] = (10 + slot).to_bytes(2, "little")
+                raw[start + 0x3A:start + 0x3C] = (20 + slot).to_bytes(2, "little")
+            return bytes(raw)
+
+    fake = BlockInstance()
+    reader = StateReader(fake, MemoryMap(party_struct_size=100))
+
+    hp, max_hp = reader._read_party_hp_pair(0x1000, 0x38, 0x3A)
+
+    assert hp == [10, 11, 12, 13, 14, 15]
+    assert max_hp == [20, 21, 22, 23, 24, 25]
+    assert fake.block_reads == 1
+
+
 def test_party_hp_marks_blackout_when_rom_outcome_flag_is_not_set() -> None:
     memory_map = MemoryMap(
         player_party_base=0x1000,

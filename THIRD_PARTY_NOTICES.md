@@ -56,3 +56,18 @@ The embedded calculator also includes browser libraries such as jQuery, Select2,
 `data/calc_data.json` records its source as `@pkmn/data`. The repository also contains trainer and mechanics data assembled for Pokemon Run & Bun interoperability. Pokemon names, move names, character names, audiovisual material, and game data are not granted under this project's MIT License.
 
 This project does not claim ownership of Pokemon, Pokemon Emerald, Game Boy Advance, or Pokemon Run & Bun. No license in this repository grants permission to distribute a commercial game ROM or third-party ROM hack.
+
+## Pokémon Emerald map and trainer references
+
+The trainer-event coordinates and map structure used by the interactive Emerald
+atlas were derived from the community-maintained
+[`pret/pokeemerald`](https://github.com/pret/pokeemerald) decompilation. The
+project's render tools use a locally supplied, user-owned Emerald ROM to create
+the map-floor and overworld trainer images under `web/static/emerald-maps/` and
+`web/static/emerald-trainers/`.
+
+Those rendered game graphics, Pokémon names, trainer characters, maps, and other
+Pokémon audiovisual material remain property of their respective rights holders.
+They are not relicensed by the root MIT License. No ROM data or save-state binary
+is included in the judge-facing checkpoint library; only decoded battle metadata
+needed by the simulator is distributed.

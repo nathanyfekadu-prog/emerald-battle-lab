@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 from emulator.mgba_instance import MGBAInstance
+from emulator.overworld import OverworldMover
 from emulator.preparation import rewrite_held_item
 from optimizer.gen3_save import SUBSTRUCT_ORDERS, _checksum, decode_box_pokemon
 from optimizer.box_optimizer import BoxScanResult, _apply_requests_for_team
-from optimizer.gen3_save import DecodedPokemon, RomNameResolver, SavePointers
+from optimizer.gen3_save import (
+    DecodedPokemon, RomNameResolver, SavePointers, discover_save_pointers,
+    EMERALD_SAVE_BLOCK_1_PTR, EMERALD_SAVE_BLOCK_2_PTR, EMERALD_POKEMON_STORAGE_PTR,
+    read_player_name,
+)
 
 
 def test_run_bun_item_520_is_the_observed_oran_berry(tmp_path):
@@ -94,6 +99,42 @@ def test_large_bridge_writes_are_split_below_protocol_line_limit():
     assert all(len(command) < 4096 for command in commands)
     assert commands[0].startswith("WRITEBLOCK 33554432 ")
     assert commands[-1].startswith(f"WRITEBLOCK {0x02000000 + 8192} ")
+
+
+def test_empty_vanilla_emerald_pc_still_finds_save_pointers():
+    class FakeInstance:
+        def read_u32(self, address):
+            return {
+                EMERALD_SAVE_BLOCK_1_PTR: 0x02025000,
+                EMERALD_SAVE_BLOCK_2_PTR: 0x02024000,
+                EMERALD_POKEMON_STORAGE_PTR: 0x02026000,
+            }[address]
+
+        def read_u8(self, _address):
+            return 3
+
+    pointers = discover_save_pointers(FakeInstance(), None, {}, {}, {})  # type: ignore[arg-type]
+    assert pointers == SavePointers(0x02025000, 0x02024000, 0x02026000, "vanilla-emerald-iwram")
+
+
+def test_emerald_player_name_and_position_use_live_save_blocks():
+    class FakeInstance:
+        def read_u32(self, address):
+            return {
+                EMERALD_SAVE_BLOCK_1_PTR: 0x02025000,
+                EMERALD_SAVE_BLOCK_2_PTR: 0x02024000,
+            }.get(address, 0)
+
+        def read_u16(self, address):
+            return {0x02025000: 4, 0x02025002: 17}.get(address, 0)
+
+        def read_block(self, address, _length):
+            assert address == 0x02024000
+            return bytes.fromhex("ceddd6e3ffffffff")
+
+    instance = FakeInstance()
+    assert read_player_name(instance) == "Tibo"  # type: ignore[arg-type]
+    assert OverworldMover(instance).position() == (4, 17)  # type: ignore[arg-type]
 
 
 def test_apply_plan_cannot_borrow_an_item_from_an_unselected_box():

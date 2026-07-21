@@ -11,9 +11,7 @@ from typing import Any, Callable
 import config
 from battle.action import Action
 from battle.battle_state import BattleState
-from emulator.mgba_instance import MGBAInstance
 from emulator.mgba_pool import MGBAPool
-from emulator.state_reader import StateReader
 from outcome import Outcome, TrialSpec, TurnAction, TurnSnapshot
 from search.action_enumerator import ActionEnumerator
 
@@ -141,15 +139,17 @@ class MCTS:
         final_line_candidates: int = config.FINAL_LINE_CANDIDATES,
         on_node_visited: Callable[[dict[str, Any]], None] | None = None,
         cancel_event: threading.Event | None = None,
+        game_mode: str = "run-and-bun",
     ):
         self.rom_path = rom_path
         self.save_state_path = save_state_path
-        self.pool = MGBAPool(rom_path, save_state_path, pool_size)
+        self.pool = MGBAPool(rom_path, save_state_path, pool_size, game_mode=game_mode)
         self.max_turns = max_turns
         self.trials_per_node = trials_per_node
         self.final_line_trials = max(1, final_line_trials)
         self.final_line_candidates = max(1, final_line_candidates)
-        self.enumerator = ActionEnumerator()
+        self.game_mode = game_mode
+        self.enumerator = ActionEnumerator(game_mode)
         self.total_trials_run = 0
         self._trial_counter = 0
         self.initial_state = self._read_initial_state()
@@ -282,8 +282,8 @@ class MCTS:
                     item["stats"].avg_hp,
                 ),
             )
-            recommended_line = best_validation["line"]
             recommended_outcome = _best_outcome_from_list(best_validation["outcomes"])
+            recommended_line = _trim_line_to_outcome(best_validation["line"], recommended_outcome, self.initial_state.is_doubles)
             recommended_stats = best_validation["stats"]
         else:
             recommended_stats = recommended.stats
@@ -322,14 +322,24 @@ class MCTS:
         """
         lines: list[list[TurnAction]] = []
         seen: set[tuple[tuple[Action, ...], ...]] = set()
+        # Always test the obvious fast clear first. If plain attacking survives
+        # every replay, the solver should not invent setup turns for a Wurmple.
+        fast_action = self.enumerator.finishing_action(self.root_actions, self.initial_state)
+        if fast_action is not None:
+            fast_line = [fast_action] * self.max_turns
+            lines.append(fast_line)
+            seen.add(_line_key(fast_line))
         for node in ranked_nodes:
-            line = _best_full_line(node, self.initial_state.is_doubles)
+            line = self._pad_validation_line(
+                _best_full_line(node, self.initial_state.is_doubles)
+            )
             key = _line_key(line)
             if line and key not in seen:
                 seen.add(key)
                 lines.append(line)
             if len(lines) >= self.final_line_candidates:
                 break
+        fallback_line = self._pad_validation_line(fallback_line)
         if fallback_line and _line_key(fallback_line) not in seen:
             lines.append(fallback_line)
         lines = lines[: self.final_line_candidates]
@@ -351,7 +361,11 @@ class MCTS:
                     actions=list(line),
                     rng_advance_frames=rng_frames,
                     max_turns=len(line),
-                    capture_screens=sample < min(4, self.final_line_trials),
+                    # One representative replay is enough for the live preview.
+                    # Every trial still executes and contributes full HP/actions
+                    # to scoring; avoiding duplicate full-frame IPC does not
+                    # reduce RNG coverage or validation accuracy.
+                    capture_screens=sample == 0,
                 ))
             outcomes = self.pool.run_trials(trials)
             self.total_trials_run += len(outcomes)
@@ -383,6 +397,26 @@ class MCTS:
                     },
                 })
         return validated
+
+    def _pad_validation_line(self, line: list[TurnAction]) -> list[TurnAction]:
+        """Keep a discovered win valid across ordinary damage rolls.
+
+        Discovery records only the actions needed by that particular rollout.
+        A favorable roll can therefore produce a six-turn line that needs a
+        seventh attack on another seed. Final proof must have an instruction
+        for that branch. The emulator stops as soon as the battle ends, so a
+        deterministic attacking tail is harmless for shorter clears.
+        """
+        if not line or len(line) >= self.max_turns:
+            return list(line)
+        finisher = self._finishing_action()
+        if finisher is None:
+            return list(line)
+        return list(line) + [finisher] * (self.max_turns - len(line))
+
+    def _finishing_action(self) -> TurnAction | None:
+        """Choose actual damage for the low-roll tail, never a status loop."""
+        return self.enumerator.finishing_action(self.root_actions, self.initial_state)
 
     def _select(self, root: Node) -> Node:
         node = root
@@ -468,11 +502,7 @@ class MCTS:
             node = node.parent
 
     def _read_initial_state(self) -> BattleState:
-        instance = MGBAInstance(self.rom_path, self.save_state_path, 99)
-        try:
-            return StateReader(instance).read()
-        finally:
-            instance.shutdown()
+        return self.pool.warmup_and_read_state()
 
 
 def score_outcomes(outcomes: list[Outcome], initial_state: BattleState) -> LineStats:
@@ -796,6 +826,16 @@ def _actions_to_turns(actions: list[Action], is_doubles: bool) -> list[TurnActio
         turns.append(tuple(actions[index : index + 2]))
         index += 2
     return turns
+
+
+def _trim_line_to_outcome(
+    line: list[TurnAction], outcome: Outcome | None, is_doubles: bool
+) -> list[TurnAction]:
+    """Hide unused safety-tail instructions from the user-facing plan."""
+    if outcome is None or not outcome.actions_taken:
+        return list(line)
+    executed = _actions_to_turns(outcome.actions_taken, is_doubles)
+    return list(line[: len(executed)])
 
 
 def _flowchart_from_node(root: Node, recommended: Node) -> FlowchartNode:

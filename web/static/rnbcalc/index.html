@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8" />
-    <title>RnB Damage Calculator</title>
+    <title>Pokémon Emerald Damage Calculator</title>
     <link type="text/css" rel="stylesheet" href="./js/vendor/select2/select2.css" />
     <link type="text/css" rel="stylesheet" href="./css/main.css?f5e38883" />
     <link type="text/css" rel="stylesheet" href="./css/vendor/bootstrap.css" />
@@ -39,7 +39,8 @@
     <nav><div class="header"><div class="header-color"><div class="header-inner">
     </div></div></div></nav>
 
-<div id="changelog-overlay">
+<style>#changelog-overlay, #show-changelog { display: none !important; }</style>
+<div id="changelog-overlay" aria-hidden="true">
   <div id="changelog-popup">
     <span id="changelog-close">&times;</span>
     <h2>Changelog</h2>
@@ -57,7 +58,7 @@
         <h2>Export All</h2>
         <button id="massExport-copy" class="btn-copy" title="Copy to clipboard">    
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-            <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1z"/>
+            <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1z"/>
             <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0z"/>
           </svg>
           Copy
@@ -128,10 +129,10 @@
 
 <div class="wrapper">
     <div aria-label="Settings" role="region">
-        <span class="title-text">Pok&eacute;mon Damage Calculator</span>
+        <span class="title-text">Pok&eacute;mon Emerald Damage Calculator</span>
         <span class="genSelection" aria-labelledby="selectGenInstruction" role="radiogroup" title="Select the generation.">
             <span class="visually-hidden" id="selectGenInstruction">Select the generation.</span>
-            <input class="gen visually-hidden" type="radio" name="gen" value="8" id="gen8" checked="checked" />
+            <input class="gen visually-hidden" type="radio" name="gen" value="3" id="gen3" checked="checked" />
         </span>
         <span class="notationSelection" aria-labelledby="selectNotationInstruction" role="radiogroup" title="Select the output notation.">
             <span class="visually-hidden" id="selectNotationInstruction">Select the output notation.</span>
@@ -1923,6 +1924,7 @@
     <script type="text/javascript" src="./js/data/sets/gen5.js?c8933737"></script>
     <script type="text/javascript" src="./js/data/sets/gen4.js?c6ea7dc0"></script>
     <script type="text/javascript" src="./js/data/sets/gen3.js?a470a1a8"></script>
+    <script type="text/javascript" src="./js/data/sets/emerald.js"></script>
     <script type="text/javascript" src="./js/data/sets/gen2.js?7fd2ab00"></script>
     <script type="text/javascript" src="./js/data/sets/gen1.js?428f44e9"></script>
     <script type="text/javascript" src="./js/data/changelog.js?ccc45dc8"></script>

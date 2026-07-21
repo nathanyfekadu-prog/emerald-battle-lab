@@ -24,6 +24,13 @@ IWRAM_START = 0x03005000
 IWRAM_LENGTH = 0x3000
 EWRAM_START = 0x02000000
 EWRAM_CHUNK = 0x20000
+# Vanilla US Emerald keeps the three save pointers consecutively in IWRAM.
+# Run & Bun relocates data, so discovery remains the primary path; this explicit
+# fallback lets an empty early-game PC still expose the player's party.
+EMERALD_SAVE_BLOCK_1_PTR = 0x03005D8C
+EMERALD_SAVE_BLOCK_2_PTR = 0x03005D90
+EMERALD_POKEMON_STORAGE_PTR = 0x03005D94
+SAVE_BLOCK_2_PLAYER_NAME_OFFSET = 0
 ITEM_STRUCT_SIZE = 44
 ITEM_NAME_LENGTH = 14
 MOVE_NAME_LENGTH = 13
@@ -150,8 +157,16 @@ class RomNameResolver:
         self._rom: bytes | None = None
         self._move_base: int | None = None
         self._item_base: int | None = None
+        self._species_base: int | None = None
 
     def species_name(self, species_id: int, species_by_num: dict[int, str]) -> str:
+        base = self._get_species_base()
+        if base is not None and species_id > 0:
+            decoded = _clean_decoded_name(
+                self._decode_game_bytes(self._rom_bytes()[base + species_id * 11 : base + (species_id + 1) * 11])
+            )
+            if decoded:
+                return decoded.casefold().replace(" ", "-")
         return species_by_num.get(species_id, f"Species {species_id}")
 
     def move_name(self, move_id: int, moves_by_num: dict[int, str], moves: dict[str, Any]) -> str:
@@ -185,10 +200,33 @@ class RomNameResolver:
     def _get_move_base(self) -> int | None:
         if self._move_base is not None:
             return self._move_base
-        self._move_base = self._rom_bytes().find(_encode_game_string("Pound"))
-        if self._move_base < 0:
-            self._move_base = None
+        rom = self._rom_bytes()
+        for pound in ("Pound", "POUND"):
+            hit = rom.find(_encode_game_string(pound))
+            while hit >= 0:
+                next_name = self._decode_game_bytes(
+                    rom[hit + MOVE_NAME_LENGTH : hit + MOVE_NAME_LENGTH * 2]
+                )
+                if next_name.casefold() == "karate chop":
+                    self._move_base = hit
+                    return hit
+                hit = rom.find(_encode_game_string(pound), hit + 1)
+        self._move_base = None
         return self._move_base
+
+    def _get_species_base(self) -> int | None:
+        if self._species_base is not None:
+            return self._species_base
+        rom = self._rom_bytes()
+        # Entry zero is "??????????"; Bulbasaur is entry one.
+        hit = rom.find(_encode_game_string("BULBASAUR"))
+        while hit >= 0:
+            base = hit - 11
+            if self._decode_game_bytes(rom[base + 22 : base + 33]) == "IVYSAUR":
+                self._species_base = base
+                return base
+            hit = rom.find(_encode_game_string("BULBASAUR"), hit + 1)
+        return None
 
     def _get_item_base(self) -> int | None:
         if self._item_base is not None:
@@ -237,6 +275,18 @@ def read_save_snapshot(
     return SaveSnapshot(pointers=pointers, party=party, boxes=boxes, bag=bag)
 
 
+def read_player_name(instance: MGBAInstance, save_block_2: int | None = None) -> str:
+    """Read the active Gen III save's player name from live RAM."""
+    pointer = save_block_2
+    if pointer is None:
+        pointer = instance.read_u32(EMERALD_SAVE_BLOCK_2_PTR)
+    if pointer is None or not EWRAM_START <= pointer < EWRAM_START + EWRAM_CHUNK * 2:
+        return ""
+    return _clean_decoded_name(
+        _decode_game_text(instance.read_block(pointer + SAVE_BLOCK_2_PLAYER_NAME_OFFSET, 8))
+    )
+
+
 def discover_save_pointers(
     instance: MGBAInstance,
     resolver: RomNameResolver,
@@ -244,6 +294,21 @@ def discover_save_pointers(
     moves_by_num: dict[int, str],
     moves: dict[str, Any],
 ) -> SavePointers:
+    vanilla = SavePointers(
+        save_block_1=instance.read_u32(EMERALD_SAVE_BLOCK_1_PTR),
+        save_block_2=instance.read_u32(EMERALD_SAVE_BLOCK_2_PTR),
+        pokemon_storage=instance.read_u32(EMERALD_POKEMON_STORAGE_PTR),
+        source="vanilla-emerald-iwram",
+    )
+    if (
+        vanilla.save_block_1 is not None
+        and EWRAM_START <= vanilla.save_block_1 < EWRAM_START + 0x40000
+        and vanilla.save_block_2 is not None
+        and EWRAM_START <= vanilla.save_block_2 < EWRAM_START + 0x40000
+    ):
+        party_count = instance.read_u8(vanilla.save_block_1 + SAVE_BLOCK_1_PARTY_COUNT_OFFSET)
+        if 0 <= party_count <= PARTY_SIZE:
+            return vanilla
     iwram = instance.read_block(IWRAM_START, IWRAM_LENGTH)
     triples: list[SavePointers] = []
     for offset in range(0, len(iwram) - 12, 4):

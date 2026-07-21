@@ -37,6 +37,7 @@ from search.action_enumerator import ActionEnumerator
 from search.mcts import MCTS, SearchCancelled, SearchResult, _simulator_trial_data
 from outcome import TrialSpec
 from optimizer.box_optimizer import PrepareResult, run_prepare, scan_pc_boxes
+from optimizer.gen3_save import read_player_name
 from output.pdf_plan import build_battle_plan_pdf
 from optimizer.turn_planner import (
     set_entry_turn,
@@ -75,6 +76,7 @@ from optimizer.turn_planner import (
     crit_rate,
     _speed,
     _skip_turn,
+    _will_skip_turn,
     _move_priority_for,
     _move_accuracy,
     PlayerAction,
@@ -97,8 +99,9 @@ from battle.damage_calc import (
     FieldState,
     PokemonCalcSet,
 )
-from trainer_data.loader import load_trainer_battles
+from trainer_data.loader import load_trainer_battles, load_trainer_battles_for_mode, normalize_game_mode
 from trainer_data.models import TrainerBattle, TrainerPokemon
+from tools.render_run_video import render_run_video
 from web.ws_manager import WSManager
 
 app = FastAPI()
@@ -112,6 +115,16 @@ app.mount(
     "/demo",
     StaticFiles(directory=Path(__file__).resolve().parents[1] / "demo"),
     name="judge-demo",
+)
+app.mount(
+    "/submission",
+    StaticFiles(directory=Path(__file__).resolve().parents[1] / "submission"),
+    name="submission-artifacts",
+)
+app.mount(
+    "/static",
+    StaticFiles(directory=Path(__file__).parent / "static"),
+    name="app-static",
 )
 app.mount(
     "/rnbcalc",
@@ -138,6 +151,7 @@ class SolveRequest(BaseModel):
     final_line_trials: int = config.FINAL_LINE_TRIALS
     final_line_candidates: int = config.FINAL_LINE_CANDIDATES
     nuzlocke: bool = False
+    game_mode: str = "run-and-bun"
 
 
 class PrepareRequest(BaseModel):
@@ -173,10 +187,12 @@ class OpenGBARequest(BaseModel):
 class SimulatorInspectRequest(BaseModel):
     rom: str
     state: str
+    game_mode: str = "run-and-bun"
 
 
 class SimulatorCheckpointRequest(BaseModel):
     rom: str
+    game_mode: str = "run-and-bun"
     source_state: str = ""
     output_state: str = ""
     settle_frames: int = Field(default=120, ge=0, le=3600)
@@ -206,10 +222,12 @@ class AutonomyRouteRequest(BaseModel):
     checkpoint_every: int = Field(default=1, ge=1, le=100)
     destination: str = ""
     trainer_id: int | None = None
+    game_mode: str = "run-and-bun"
 
 
 class CalcSimRequest(BaseModel):
     trainer_id: int
+    game_mode: str = "run-and-bun"
     imports: str = ""
     max_turns: int = 30
     # New lines should be safe against enemy critical hits unless the user
@@ -226,12 +244,17 @@ class CalcSimRequest(BaseModel):
     custom_is_double: bool = True
     player_leads: list[int] = Field(default_factory=list)
     enemy_leads: list[int] = Field(default_factory=list)
+    hint_mode: bool = False
+    level_cap: int | None = Field(default=None, ge=1, le=100)
+    ruleset: str = "hardcore-nuzlocke"
+    items_in_battle: bool = False
 
 
 class GauntletSimRequest(BaseModel):
     """Plan several trainers in order with an optional no-heal state handoff."""
 
-    trainer_ids: list[int] = Field(min_length=1, max_length=20)
+    trainer_ids: list[int] = Field(min_length=1, max_length=512)
+    game_mode: str = "run-and-bun"
     imports: str = ""
     max_turns: int = 30
     crit_safe: bool = True
@@ -246,6 +269,17 @@ class GauntletSimRequest(BaseModel):
     rom: str = ""
     pc_state: str = ""
     use_live_pc_box: bool = True
+    # Judge-facing Emerald defaults: bag healing between League fights, no
+    # Revives, no battle items, and progressive hints kept off unless requested.
+    ruleset: str = "hardcore-nuzlocke"
+    items_in_battle: bool = False
+    allow_revives: bool = False
+    healing_mode: str = "bag"
+    hint_mode: bool = False
+    leveling_policy: str = "party-max"
+    # Always optimize for zero faints first. This is only the maximum number of
+    # tactical sacrifices the user is willing to accept if no zero-faint route exists.
+    max_total_faints: int = Field(default=0, ge=0, le=6)
 
 
 class ApplyGauntletFightRequest(BaseModel):
@@ -263,18 +297,25 @@ class CompleteFlowchartRequest(CalcSimRequest):
 class PlanPdfRequest(BaseModel):
     result: dict[str, Any]
     trainer_label: str = "Battle Plan"
+    game_mode: str = "run-and-bun"
 
 
 _CALC_RUNS_DIR = Path(__file__).resolve().parents[1] / "output" / "line_runs"
 _GAUNTLET_RUNS_DIR = Path(__file__).resolve().parents[1] / "output" / "gauntlet_runs"
+_CALC_RUNS_DIR.mkdir(parents=True, exist_ok=True)
 _GAUNTLET_RUNS_DIR.mkdir(parents=True, exist_ok=True)
+app.mount(
+    "/calc-artifacts",
+    StaticFiles(directory=_CALC_RUNS_DIR),
+    name="calc-artifacts",
+)
 app.mount(
     "/gauntlet-artifacts",
     StaticFiles(directory=_GAUNTLET_RUNS_DIR),
     name="gauntlet-artifacts",
 )
-_CALC_ENGINE_VERSION = "2026-07-13-recoil-state-v1"
-_GAUNTLET_ENGINE_VERSION = "2026-07-14-playbook-replay-v6"
+_CALC_ENGINE_VERSION = "2026-07-21-mandatory-video-v2"
+_GAUNTLET_ENGINE_VERSION = "2026-07-21-route-coverage-video-v8"
 _GAUNTLET_PLAYBOOKS_DIR = Path(__file__).resolve().parents[1] / "config" / "gauntlet_playbooks"
 
 
@@ -353,6 +394,62 @@ def _repair_gauntlet_battle(
     }
 
 
+def _cartridge_replay_safety(payload: dict[str, Any]) -> dict[str, Any]:
+    """Derive deathless/min-HP proof from raw recorded battle frames.
+
+    Recorder completion alone only proves that the route reached the end. A Nuzlocke
+    proof must also show that every occupied party slot stayed above zero throughout
+    each fight. Empty party slots begin at zero and are intentionally ignored.
+    """
+    occupied: set[int] = set()
+    minimum_hp: int | None = None
+    battles_checked = 0
+    for event in payload.get("events") or []:
+        kind = event.get("event")
+        values = event.get("party_hp") if kind in {"battle_start", "battle_won"} else event.get("player_hp")
+        if kind == "battle_start":
+            occupied = {index for index, hp in enumerate(values or []) if int(hp or 0) > 0}
+            battles_checked += 1
+        if not occupied or values is None:
+            continue
+        for index in occupied:
+            hp = int(values[index] or 0) if index < len(values) else 0
+            if hp <= 0:
+                return {
+                    "deathless": False, "minimum_player_hp": 0,
+                    "battles_checked": battles_checked,
+                    "failed_trainer": event.get("trainer"),
+                    "failed_turn": event.get("turn"),
+                    "failed_slot": index,
+                }
+            minimum_hp = hp if minimum_hp is None else min(minimum_hp, hp)
+    return {
+        "deathless": battles_checked > 0,
+        "minimum_player_hp": minimum_hp or 0,
+        "battles_checked": battles_checked,
+    }
+
+
+def _validation_with_recorded_safety(result: dict[str, Any]) -> dict[str, Any] | None:
+    validation = copy.deepcopy(result.get("emulator_validation") or {})
+    log_names = (result.get("emulator_artifacts") or {}).get("logs") or []
+    summaries: list[dict[str, Any]] = []
+    for name in log_names:
+        path = Path(name)
+        if not path.is_absolute():
+            path = Path(__file__).resolve().parents[1] / path
+        try:
+            summaries.append(_cartridge_replay_safety(json.loads(path.read_text(encoding="utf-8"))))
+        except (OSError, TypeError, json.JSONDecodeError):
+            continue
+    if summaries:
+        validation["replay_summaries"] = summaries
+        validation["fixed_replays"] = len(summaries)
+        validation["fixed_deathless_wins"] = sum(bool(item.get("deathless")) for item in summaries)
+        validation["minimum_player_hp"] = min(int(item.get("minimum_player_hp") or 0) for item in summaries)
+    return validation or None
+
+
 def _run_gauntlet_cartridge_proof(
     request: GauntletSimRequest,
     trainers: list[TrainerBattle],
@@ -423,19 +520,21 @@ def _run_gauntlet_cartridge_proof(
             )
             continue
         payload = json.loads(log.read_text(encoding="utf-8"))
+        replay_safety = _cartridge_replay_safety(payload)
         actual = [str(value) for value in payload.get("trainers") or []]
         if not (
             payload.get("proof_complete") is True
             and payload.get("uncut") is True
             and int(payload.get("savestate_loads_after_start", -1)) == 0
             and payload.get("graveyard_used") is False
+            and replay_safety["deathless"] is True
             and len(actual) == len(expected)
             and all(want.casefold() in got.casefold() or got.casefold() in want.casefold()
                     for want, got in zip(expected, actual))
             and video.is_file() and video.stat().st_size > 0
         ):
             raise RuntimeError(f"Cartridge replay {replay} did not satisfy the Nuzlocke proof gate")
-        artifacts.append({"video": video, "log": log, "post_state": post_state})
+        artifacts.append({"video": video, "log": log, "post_state": post_state, "safety": replay_safety})
         _GAUNTLET_PROGRESS.update(
             running=True, stage="cartridge-proof",
             phase=f"Completed in-game replay {replay} of 2",
@@ -487,6 +586,8 @@ def _run_gauntlet_cartridge_proof(
             "fixed_replays": 2, "fixed_deathless_wins": 2,
             "sampled_replays": 0, "sampled_deathless_wins": 0,
             "uncut_route_replays": 2,
+            "minimum_player_hp": min(int(item["safety"]["minimum_player_hp"]) for item in artifacts),
+            "replay_summaries": [item["safety"] for item in artifacts],
         },
         "videos": [
             {
@@ -639,7 +740,7 @@ def _gauntlet_run_path(run_id: str) -> Path:
 
 
 def _save_gauntlet_run(request: GauntletSimRequest, result: dict[str, Any]) -> dict[str, Any]:
-    """Persist the full route request, every chosen party, and the stopping reason."""
+    """Persist the full route and its mandatory complementary MP4 replay."""
     _GAUNTLET_RUNS_DIR.mkdir(parents=True, exist_ok=True)
     created_at = datetime.now(timezone.utc)
     payload = _request_payload(request)
@@ -647,12 +748,19 @@ def _save_gauntlet_run(request: GauntletSimRequest, result: dict[str, Any]) -> d
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()[:10]
     run_id = f"{created_at.strftime('%Y%m%dT%H%M%S%f')}-{digest}"
+    video_path = _GAUNTLET_RUNS_DIR / f"{run_id}-planner-replay.mp4"
+    video = render_run_video(result, video_path, kind="gauntlet")
+    video["video_url"] = f"/gauntlet-artifacts/{video_path.name}"
+    result.setdefault("videos", []).append(video)
+    result["video_ready"] = True
+    result["evidence_policy"] = "video-and-text-required"
     record = {
         "id": run_id,
         "engine_version": _GAUNTLET_ENGINE_VERSION,
         "created_at": created_at.isoformat(),
         "request": payload,
         "result": result,
+        "game_mode": payload.get("game_mode", "run-and-bun"),
     }
     path = _gauntlet_run_path(run_id)
     temp = path.with_suffix(".tmp")
@@ -665,6 +773,7 @@ def _save_gauntlet_run(request: GauntletSimRequest, result: dict[str, Any]) -> d
         "completed": result.get("completed", 0),
         "queued": result.get("queued", 0),
         "stopped_reason": result.get("stopped_reason"),
+        "game_mode": record["game_mode"],
     }
 
 
@@ -711,12 +820,15 @@ def _sim_run_path(run_id: str) -> Path:
 
 
 def _sim_run_summary(record: dict[str, Any]) -> dict[str, Any]:
-    return {key: record.get(key) for key in (
+    summary = {key: record.get(key) for key in (
         "id", "created_at", "trainer", "status", "won", "deathless", "player_faints",
         "turn_count", "video_url", "video_ready", "error", "final_player_hp", "final_enemy_hp",
         "strategy_status", "normal_clear_rate", "confidence_replays",
         "videos", "team", "comparison", "critical_analysis", "proof_complete",
+        "output_state",
     )}
+    summary["game_mode"] = normalize_game_mode((record.get("request") or {}).get("game_mode"))
+    return summary
 
 
 def _actions_from_validation(payload: dict[str, Any]) -> list[tuple[Action, ...]]:
@@ -738,7 +850,7 @@ def _solve_crit_diversion(
     turn = max(1, min(len(line), int(diversion.get("turn") or 1)))
     offset = int(diversion.get("rng_frames") or 0)
     checkpoint = _SIM_CHECKPOINTS_DIR / f"{run_id}-crit-turn-{turn}.ss0"
-    pool = MGBAPool(request.rom, request.state, 1)
+    pool = MGBAPool(request.rom, request.state, 1, game_mode=request.game_mode)
     try:
         outcomes = pool.run_trials([TrialSpec(
             trial_id=900_000 + turn,
@@ -799,9 +911,13 @@ def _record_completed_simulator(request: SolveRequest, result: SearchResult, sta
     run_id = created.strftime("%Y%m%dT%H%M%S%f")
     discovery_path = _SIM_RUNS_DIR / f"{run_id}-a.mp4"
     approved_path = _SIM_RUNS_DIR / f"{run_id}-b.mp4"
+    approved_state_path = _SIM_CHECKPOINTS_DIR / f"{run_id}-post-battle.ss0"
     diversion_path = _SIM_RUNS_DIR / f"{run_id}-crit-branch.mp4"
     split_path = _SIM_RUNS_DIR / f"{run_id}-crit-split.mp4"
-    match = DamageCalculator().matched_trainer(state) if state is not None else None
+    match = (
+        DamageCalculator(game_mode=request.game_mode).matched_trainer(state)
+        if state is not None else None
+    )
     trainer = match.battle.trainer_name if match else "Unrecognized trainer"
     best_validation = max(
         result.validated_lines,
@@ -828,6 +944,7 @@ def _record_completed_simulator(request: SolveRequest, result: SearchResult, sta
     discovery_offset = int(best_validation.get("winning_rng_frames") or 0)
     critical_analysis = best_validation.get("critical_analysis") or {}
     approved_offset = int(critical_analysis.get("baseline_rng_frames") or (winning_offsets[-1] if winning_offsets else discovery_offset))
+    shared_approved_replay = False
     diversion_offset = critical_analysis.get("diversion_rng_frames")
     adaptive_diversion = None
     adaptive_diversion_error = None
@@ -852,6 +969,7 @@ def _record_completed_simulator(request: SolveRequest, result: SearchResult, sta
     )
     critical_safe = bool(critical_analysis.get("critical_safe", False))
     ordinary_line = base_ordinary_line and (critical_safe or conditionally_crit_safe)
+    shared_approved_replay = ordinary_line and approved_offset == discovery_offset
     critical_analysis = {
         **critical_analysis,
         "conditionally_safe": conditionally_crit_safe,
@@ -895,16 +1013,20 @@ def _record_completed_simulator(request: SolveRequest, result: SearchResult, sta
         capture = record_simulator_line(
             request.rom, request.state, validated_actions, discovery_path,
             rng_pre_roll_frames=discovery_offset,
+            output_state_path=approved_state_path if shared_approved_replay else None,
         )
         record.update(capture)
         record["turn_count"] = len(capture.get("turns", []))
         record["video_ready"] = discovery_path.is_file() and discovery_path.stat().st_size > 0
         record["videos"].append({
-            "kind": "discovery", "label": "A — discovery team / lucky line",
+            "kind": "approved" if shared_approved_replay else "discovery",
+            "label": "Approved ordinary line" if shared_approved_replay else "A — discovery team / lucky line",
             "video_url": record["video_url"], "video_ready": record["video_ready"],
             "rng_pre_roll_frames": discovery_offset, **capture,
         })
-        if ordinary_line:
+        if capture.get("output_state"):
+            record["output_state"] = capture["output_state"]
+        if ordinary_line and not shared_approved_replay:
             _sim_proof_update(
                 running=True, phase="Recording the approved ordinary line in game",
                 pct=94.0, video_ready=record["video_ready"], verified=False,
@@ -912,6 +1034,7 @@ def _record_completed_simulator(request: SolveRequest, result: SearchResult, sta
             approved_capture = record_simulator_line(
                 request.rom, request.state, validated_actions, approved_path,
                 instance_id=92, rng_pre_roll_frames=approved_offset,
+                output_state_path=approved_state_path,
             )
             record["videos"].append({
                 "kind": "approved", "label": (
@@ -923,6 +1046,8 @@ def _record_completed_simulator(request: SolveRequest, result: SearchResult, sta
                 "video_ready": approved_path.is_file() and approved_path.stat().st_size > 0,
                 "rng_pre_roll_frames": approved_offset, **approved_capture,
             })
+            if approved_capture.get("output_state"):
+                record["output_state"] = approved_capture["output_state"]
             if diversion_offset is not None:
                 _sim_proof_update(
                     running=True, phase="Recording the real-game crit diversion",
@@ -944,6 +1069,27 @@ def _record_completed_simulator(request: SolveRequest, result: SearchResult, sta
                     "adaptive_pivot": adaptive_diversion,
                     **diversion_capture,
                 })
+        elif ordinary_line and diversion_offset is not None:
+            _sim_proof_update(
+                running=True, phase="Recording the real-game crit diversion",
+                pct=97.0, video_ready=record["video_ready"], verified=False,
+            )
+            diversion_actions = adaptive_diversion["line"] if adaptive_diversion else validated_actions
+            diversion_capture = record_simulator_line(
+                request.rom, request.state, diversion_actions, diversion_path,
+                instance_id=93, rng_pre_roll_frames=int(diversion_offset),
+            )
+            compose_split_screen(discovery_path, diversion_path, split_path)
+            record["videos"].append({
+                "kind": "crit_diversion",
+                "label": "CRIT-LIKE DIVERSION — BASELINE / ADAPTIVE BRANCH",
+                "video_url": f"/sim-videos/{run_id}-crit-split.mp4",
+                "video_ready": split_path.is_file() and split_path.stat().st_size > 0,
+                "rng_pre_roll_frames": int(diversion_offset),
+                "diversion": critical_analysis.get("diversion"),
+                "adaptive_pivot": adaptive_diversion,
+                **diversion_capture,
+            })
     except Exception as exc:
         record.update({"status": "video_failed", "error": str(exc), "video_ready": False})
         discovery_path.unlink(missing_ok=True)
@@ -1063,7 +1209,7 @@ def _saved_run_path(run_id: str) -> Path:
 
 
 def _save_calc_run(request: CalcSimRequest, result: dict[str, Any]) -> dict[str, Any]:
-    """Persist a complete line-finder result so reopening it never reruns the search."""
+    """Persist a line-finder result together with its mandatory MP4 replay."""
     _CALC_RUNS_DIR.mkdir(parents=True, exist_ok=True)
     created_at = datetime.now(timezone.utc).isoformat()
     payload = _request_payload(request)
@@ -1071,6 +1217,12 @@ def _save_calc_run(request: CalcSimRequest, result: dict[str, Any]) -> dict[str,
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()[:10]
     run_id = f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%f')}-{digest}"
+    video_path = _CALC_RUNS_DIR / f"{run_id}-turn-replay.mp4"
+    video = render_run_video(result, video_path, kind="simulator")
+    video["video_url"] = f"/calc-artifacts/{video_path.name}"
+    result.setdefault("videos", []).append(video)
+    result["video_ready"] = True
+    result["evidence_policy"] = "video-and-text-required"
     record = {
         "id": run_id,
         "engine_version": _CALC_ENGINE_VERSION,
@@ -1082,20 +1234,25 @@ def _save_calc_run(request: CalcSimRequest, result: dict[str, Any]) -> dict[str,
         "team_names": [m.get("name") or m.get("species") for m in result.get("team", [])],
         "request": payload,
         "result": result,
+        "game_mode": payload.get("game_mode", "run-and-bun"),
     }
     path = _saved_run_path(run_id)
     temp = path.with_suffix(".tmp")
     temp.write_text(json.dumps(record, ensure_ascii=False), encoding="utf-8")
     temp.replace(path)
     return {key: record[key] for key in (
-        "id", "created_at", "trainer", "location", "result_label", "confidence", "team_names"
+        "id", "created_at", "trainer", "location", "result_label", "confidence", "team_names", "game_mode"
     )}
 
 
 def _saved_run_summary(record: dict[str, Any]) -> dict[str, Any]:
-    return {key: record.get(key) for key in (
-        "id", "created_at", "trainer", "location", "result_label", "confidence", "team_names"
+    summary = {key: record.get(key) for key in (
+        "id", "created_at", "trainer", "location", "result_label", "confidence", "team_names", "game_mode"
     )}
+    summary["game_mode"] = summary.get("game_mode") or (record.get("request") or {}).get("game_mode", "run-and-bun")
+    summary["videos"] = (record.get("result") or {}).get("videos") or []
+    summary["video_ready"] = any(video.get("video_ready") for video in summary["videos"])
+    return summary
 
 
 @app.get("/api/calc/runs")
@@ -1137,6 +1294,7 @@ class CoachStepRequest(BaseModel):
     """One step of the interactive co-pilot: given the live battle state, what to do now."""
 
     trainer_id: int
+    game_mode: str = "run-and-bun"
     imports: str = ""
     crit_safe: bool = True
     # Current state. player_active = None means "recommend the lead" (battle start).
@@ -1150,9 +1308,149 @@ class CoachStepRequest(BaseModel):
     enemy_consumed_items: list[bool] = Field(default_factory=list)
 
 
+_EMBEDDED_TRAINER_CATALOG: str | None = None
+_EMBEDDED_EMERALD_DATA: str | None = None
+
+
+def _emerald_checkpoint_library() -> dict[str, Any]:
+    path = Path(__file__).resolve().parents[1] / "data" / "emerald_checkpoint_library.json"
+    if not path.is_file():
+        return {"entries": [], "stats": {"checkpoints": 0, "unique_trainers": 0, "boss_checkpoints": 0}}
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _local_testing_config() -> dict[str, str]:
+    """Load private local paths without committing them to the browser bundle."""
+    env_file = Path(__file__).resolve().parents[1] / ".env.local"
+    file_values: dict[str, str] = {}
+    if env_file.is_file():
+        for raw_line in env_file.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            file_values[key.strip()] = value.strip().strip('"').strip("'")
+    keys = {
+        "rom": "POKEBATTLE_ROM",
+        "state": "POKEBATTLE_STATE",
+        "battle_state": "POKEBATTLE_BATTLE_STATE",
+        "pc_state": "POKEBATTLE_PC_STATE",
+        "emerald_rom": "POKEBATTLE_EMERALD_ROM",
+        "emerald_state": "POKEBATTLE_EMERALD_STATE",
+        "emerald_battle_state": "POKEBATTLE_EMERALD_BATTLE_STATE",
+        "emerald_pc_state": "POKEBATTLE_EMERALD_PC_STATE",
+    }
+    values: dict[str, str] = {}
+    for field, env_key in keys.items():
+        candidate = os.environ.get(env_key) or file_values.get(env_key, "")
+        if candidate:
+            path = Path(candidate).expanduser().resolve()
+            values[field] = str(path) if path.is_file() else ""
+        else:
+            values[field] = ""
+    return values
+
+
 @app.get("/")
 async def index() -> HTMLResponse:
-    return HTMLResponse((Path(__file__).parent / "static" / "index.html").read_text(encoding="utf-8"))
+    """Serve the trainer catalog with the app instead of fetching it after render."""
+    global _EMBEDDED_TRAINER_CATALOG, _EMBEDDED_EMERALD_DATA
+    if _EMBEDDED_TRAINER_CATALOG is None:
+        calculator = DamageCalculator()
+        catalog = [
+            _trainer_summary(index, battle, calculator)
+            for index, battle in enumerate(load_trainer_battles())
+        ]
+        # Prevent trainer text from ever terminating the inline script element.
+        _EMBEDDED_TRAINER_CATALOG = json.dumps(catalog, separators=(",", ":")).replace("<", "\\u003c")
+    if _EMBEDDED_EMERALD_DATA is None:
+        emerald_path = Path(__file__).resolve().parents[1] / "data" / "emerald_trainers.json"
+        emerald_data = json.loads(emerald_path.read_text(encoding="utf-8"))
+        emerald_data["checkpoint_library"] = _emerald_checkpoint_library()
+        _EMBEDDED_EMERALD_DATA = json.dumps(emerald_data, separators=(",", ":")).replace("<", "\\u003c")
+    html = (Path(__file__).parent / "static" / "index.html").read_text(encoding="utf-8")
+    local_config = json.dumps(_local_testing_config(), separators=(",", ":")).replace("<", "\\u003c")
+    html = html.replace("__TRAINER_CATALOG_JSON__", _EMBEDDED_TRAINER_CATALOG)
+    html = html.replace("__EMERALD_DATA_JSON__", _EMBEDDED_EMERALD_DATA)
+    return HTMLResponse(html.replace("__LOCAL_TESTING_CONFIG_JSON__", local_config))
+
+
+@app.get("/api/games/emerald/trainers")
+async def api_emerald_trainers() -> dict[str, Any]:
+    """Return the source-grounded Pokémon Emerald trainer atlas."""
+    path = Path(__file__).resolve().parents[1] / "data" / "emerald_trainers.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["checkpoint_library"] = _emerald_checkpoint_library()
+    return payload
+
+
+@app.get("/api/games/emerald/local-save")
+async def api_emerald_local_save() -> dict[str, Any]:
+    """Inspect the configured user-owned Emerald checkpoint without copying its ROM."""
+    local = _local_testing_config()
+    rom = local.get("emerald_rom", "")
+    state = local.get("emerald_state", "")
+    if not rom or not state:
+        raise HTTPException(status_code=404, detail="Add a local Emerald ROM and checkpoint first.")
+    calculator = DamageCalculator(game_mode="pokemon-emerald")
+    report = await asyncio.to_thread(scan_pc_boxes, rom, state, calculator=calculator)
+    party = [
+        {
+            "name": mon.name,
+            "species": mon.species,
+            "level": mon.level,
+            "hp": mon.hp,
+            "max_hp": mon.max_hp,
+            "moves": list(mon.moves),
+            "nature": mon.nature,
+            "ivs": mon.ivs or {},
+            "evs": mon.evs or {},
+            "item": mon.held_item,
+        }
+        for mon in report.party
+    ]
+    imports = "\n\n".join(
+        "\n".join([
+            f"{mon.display_name}{f' @ {mon.held_item}' if mon.held_item else ''}",
+            f"Level: {mon.level}",
+            f"{mon.nature} Nature" if mon.nature else "",
+            "IVs: " + " / ".join(f"{value} {stat.upper()}" for stat, value in (mon.ivs or {}).items()),
+            "EVs: " + " / ".join(f"{value} {stat.upper()}" for stat, value in (mon.evs or {}).items()),
+            *[f"- {move}" for move in mon.moves],
+        ]).strip()
+        for mon in report.party
+    )
+    return {
+        "rom": rom, "state": state, "party": party, "imports": imports,
+        "party_count": len(party), "ready": bool(party),
+        "note": "The ROM remains in its original local folder; only decoded party data is shown here.",
+    }
+
+
+@app.get("/api/games/emerald/league-proof")
+async def api_emerald_league_proof() -> dict[str, Any]:
+    """Return the committed ROM-free Elite Four judge validation, when built."""
+    path = Path(__file__).resolve().parents[1] / "submission" / "emerald-league-gauntlet.json"
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Run tools/validate_emerald_league.py first.")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    video = path.with_name("emerald-league-gauntlet-demo.mp4")
+    if video.is_file() and video.stat().st_size > 0:
+        accepted_fights = sum(
+            1 for fight in payload.get("fights") or []
+            if fight.get("result") == "win-line"
+        )
+        video_label = (
+            "Elite Four → Wallace Gauntlet demo"
+            if payload.get("result") == "route-complete"
+            else f"League validation audit · {accepted_fights}/{payload.get('queued', 5)} accepted fights"
+        )
+        payload["videos"] = [{
+            "kind": "judge-ui-validation", "label": video_label,
+            "video_url": "/submission/emerald-league-gauntlet-demo.mp4", "video_ready": True,
+        }]
+        payload["video_ready"] = True
+    return payload
 
 
 @app.get("/api/status")
@@ -1252,7 +1550,7 @@ async def api_simulator_inspect(request: SimulatorInspectRequest) -> dict[str, A
         screen = instance.screenshot()
     finally:
         instance.shutdown()
-    calculator = DamageCalculator()
+    calculator = DamageCalculator(game_mode=request.game_mode)
     match = calculator.matched_trainer(state)
     return _live_battle_payload(state, match, screen)
 
@@ -1285,15 +1583,27 @@ async def api_simulator_checkpoint(request: SimulatorCheckpointRequest) -> dict[
     )
     instance = MGBAInstance(str(rom), str(source), 67)
     try:
-        if request.settle_frames:
+        if source.suffix.casefold() == ".sav":
+            # A battery save is not an instant frozen frame. Boot the cartridge,
+            # choose Continue, and only then create the fast-load simulator state.
+            instance.advance_frames(600)
+            instance.send_input("START", 2)
+            instance.advance_frames(120)
+            for _ in range(3):
+                instance.send_input("A", 2)
+                instance.advance_frames(120)
+        elif request.settle_frames:
             instance.advance_frames(request.settle_frames)
         state = StateReader(instance).read()
-        game = WholeGameStateReader(instance).read()
+        game = WholeGameStateReader(
+            instance, DamageCalculator(game_mode=request.game_mode)
+        ).read()
+        player_name = read_player_name(instance)
         screen = instance.screenshot()
         instance.save_state(destination)
     finally:
         instance.shutdown()
-    match = DamageCalculator().matched_trainer(state)
+    match = DamageCalculator(game_mode=request.game_mode).matched_trainer(state)
     return {
         "status": "battle-ready" if game.mode == GameMode.BATTLE_COMMAND and not state.battle_over else "checkpoint-created",
         "state": str(destination),
@@ -1301,11 +1611,18 @@ async def api_simulator_checkpoint(request: SimulatorCheckpointRequest) -> dict[
         "game_mode": game.mode.value,
         "battle_ready": bool(game.mode == GameMode.BATTLE_COMMAND and not state.battle_over),
         "recognized_trainer": match.battle.trainer_name if match else None,
+        "player_name": player_name or None,
+        "position": [game.x, game.y],
+        "map_id": list(game.map_id) if game.map_id else None,
         "screen": screen,
         "note": (
             "This checkpoint is ready for the battle solver."
             if game.mode == GameMode.BATTLE_COMMAND and not state.battle_over
-            else "Checkpoint saved, but it is not at a battle command menu yet; use the checkpointed route runner to reach the trainer."
+            else (
+                f"Loaded {player_name}'s save and created a playable overworld checkpoint."
+                if player_name
+                else "Checkpoint saved, but no active player save was recognized."
+            )
         ),
     }
 
@@ -1417,7 +1734,7 @@ async def api_autonomy_route(request: AutonomyRouteRequest) -> dict[str, Any]:
             start = (*tuple(live.map_id or ()), live.x, live.y)
             trainer_token = ""
             if request.trainer_id is not None:
-                battles = load_trainer_battles()
+                battles = load_trainer_battles_for_mode(normalize_game_mode(request.game_mode))
                 if request.trainer_id < 0 or request.trainer_id >= len(battles):
                     raise HTTPException(status_code=404, detail="Unknown trainer destination")
                 trainer_token = re.sub(
@@ -1434,7 +1751,11 @@ async def api_autonomy_route(request: AutonomyRouteRequest) -> dict[str, Any]:
                     continue
                 goal = tuple(payload.get("goal") or ())
                 destination = request.destination.casefold().strip()
-                route_target = path.stem.casefold().removeprefix("center-to-")
+                route_target = (
+                    path.stem.casefold()
+                    .removeprefix("center-to-")
+                    .removeprefix("route-to-")
+                )
                 matches = destination == "pokemon_center" and goal[:2] == (6, 4)
                 if destination != "pokemon_center":
                     trainer_route_match = bool(
@@ -1445,7 +1766,7 @@ async def api_autonomy_route(request: AutonomyRouteRequest) -> dict[str, Any]:
                             or route_target.removesuffix("-coord").removesuffix("-adjacent") in trainer_token
                         )
                     )
-                    matches = path.stem.casefold().startswith("center-to-") and (
+                    matches = (
                         trainer_route_match
                         or bool(destination) and destination.replace("_", "-") in path.stem.casefold()
                     )
@@ -1462,6 +1783,10 @@ async def api_autonomy_route(request: AutonomyRouteRequest) -> dict[str, Any]:
                 )
             route_path, route_payload = candidates[0]
             actions = [RouteAction(kind="path", value=",".join(route_payload["directions"]))]
+            if request.trainer_id is not None:
+                if route_payload.get("end_face"):
+                    actions.append(RouteAction(kind="face", value=str(route_payload["end_face"])))
+                actions.append(RouteAction(kind="enter_battle", count=40, settle_frames=60))
             resolved_route = str(route_path)
         run = await asyncio.to_thread(
             runner.run, request.route_name, actions, checkpoint_every=request.checkpoint_every
@@ -1489,12 +1814,38 @@ async def api_autonomy_runs() -> dict[str, Any]:
 
 
 @app.get("/api/calc/trainers")
-async def api_calc_trainers() -> dict[str, Any]:
-    calculator = DamageCalculator()
-    battles = load_trainer_battles()
+async def api_calc_trainers(game_mode: str = "run-and-bun") -> dict[str, Any]:
+    mode = normalize_game_mode(game_mode)
+    calculator = DamageCalculator(game_mode=mode)
+    battles = load_trainer_battles_for_mode(mode)
+    trainer_rows = [_trainer_summary(index, battle, calculator) for index, battle in enumerate(battles)]
+    checkpoint_library: dict[str, Any] | None = None
+    if mode == "pokemon-emerald":
+        checkpoint_library = _emerald_checkpoint_library()
+        entries_by_trainer: dict[int, list[dict[str, Any]]] = {}
+        for entry in checkpoint_library.get("entries") or []:
+            entries_by_trainer.setdefault(int(entry["trainer_id"]), []).append(entry)
+        trainer_rows = [
+            {
+                **trainer_rows[trainer_id],
+                "checkpoint_count": len(entries),
+                "checkpoint_ids": [entry["checkpoint_id"] for entry in entries],
+                "tier": "boss" if any(entry.get("tier") == "boss" for entry in entries) else (
+                    "story" if any(entry.get("tier") == "story" for entry in entries) else "trainer"
+                ),
+                "recommended_test": any(entry.get("recommended_test") for entry in entries),
+                "checkpoint_team_import": entries[-1].get("team_import") or "",
+                "checkpoint_roster_import": entries[-1].get("roster_import") or entries[-1].get("team_import") or "",
+            }
+            for trainer_id, entries in sorted(entries_by_trainer.items())
+            if 0 <= trainer_id < len(trainer_rows)
+        ]
     return {
-        "trainers": [_trainer_summary(index, battle, calculator) for index, battle in enumerate(battles)],
-        "sample_import": SAMPLE_CALC_IMPORT,
+        "trainers": trainer_rows,
+        "sample_import": EMERALD_SAMPLE_CALC_IMPORT if mode == "pokemon-emerald" else SAMPLE_CALC_IMPORT,
+        "game_mode": mode,
+        "game_label": "Pokémon Emerald" if mode == "pokemon-emerald" else "Run & Bun",
+        "checkpoint_library": checkpoint_library,
     }
 
 
@@ -1680,12 +2031,13 @@ async def api_calc_gauntlet_playbooks() -> dict[str, Any]:
 
 @app.post("/api/calc/sim")
 async def api_calc_sim(request: CalcSimRequest) -> dict[str, Any]:
+    mode = normalize_game_mode(request.game_mode)
     calculator = DamageCalculator(default_field=FieldState(
         weather=request.weather,
         is_reflect=request.reflect,
         is_light_screen=request.light_screen,
-    ))
-    battles = load_trainer_battles()
+    ), game_mode=mode)
+    battles = load_trainer_battles_for_mode(mode)
     imported = _parse_imported_sets(request.imports, calculator)
     if not imported:
         raise HTTPException(status_code=400, detail="Import at least one Pokemon set.")
@@ -1712,6 +2064,9 @@ async def api_calc_sim(request: CalcSimRequest) -> dict[str, Any]:
         result["trainer"] = trainer.trainer_name
         result["location"] = trainer.location
         result["is_doubles"] = trainer.is_double
+        result["game_mode"] = mode
+        result["game_label"] = "Pokémon Emerald" if mode == "pokemon-emerald" else "Run & Bun"
+        result["mechanics"] = "Generation III" if mode == "pokemon-emerald" else "Run & Bun ruleset"
         result["alternate_answer_lines"] = await asyncio.to_thread(
             _alternate_answer_lines,
             imported,
@@ -1721,6 +2076,23 @@ async def api_calc_sim(request: CalcSimRequest) -> dict[str, Any]:
             max_turns=max(1, min(60, request.max_turns)),
             force_enemy_crits=request.crit_safe,
         )
+        if mode == "pokemon-emerald":
+            result["rules"] = {
+                "ruleset": request.ruleset,
+                "items_in_battle": bool(request.items_in_battle),
+                "revives_allowed": request.ruleset == "standard",
+                "hint_mode": bool(request.hint_mode),
+            }
+            result["level_guidance"] = _emerald_level_guidance(
+                imported, trainer, result, request.level_cap, calculator
+            )
+            result["failure_diagnosis"] = _emerald_failure_diagnosis(
+                imported, trainer, result, result["level_guidance"], calculator
+            )
+            result["progressive_hints"] = _emerald_progressive_hints(
+                imported, trainer, result, result["level_guidance"], calculator
+            )
+            result["hint_mode"] = bool(request.hint_mode)
         if trainer.is_double and not result.get("contingency_flowchart"):
             chosen_names = {
                 _normalize(str(member.get("name") or member.get("species") or ""))
@@ -1761,7 +2133,8 @@ async def api_calc_gauntlet(request: GauntletSimRequest) -> dict[str, Any]:
     cached = _cached_gauntlet_run(request)
     if cached is not None:
         return cached
-    battles = load_trainer_battles()
+    mode = normalize_game_mode(request.game_mode)
+    battles = load_trainer_battles_for_mode(mode)
     invalid = [trainer_id for trainer_id in request.trainer_ids if trainer_id < 0 or trainer_id >= len(battles)]
     if invalid:
         raise HTTPException(status_code=400, detail=f"Unknown trainer id: {invalid[0]}")
@@ -1769,7 +2142,7 @@ async def api_calc_gauntlet(request: GauntletSimRequest) -> dict[str, Any]:
         weather=request.weather,
         is_reflect=request.reflect,
         is_light_screen=request.light_screen,
-    ))
+    ), game_mode=mode)
     imported = _parse_imported_sets(request.imports, calculator)
     roster_source = "text import"
     if request.use_live_pc_box and request.rom and request.pc_state:
@@ -1778,16 +2151,29 @@ async def api_calc_gauntlet(request: GauntletSimRequest) -> dict[str, Any]:
                 _normalize(member.species): member.ability
                 for member in imported if member.ability
             }
-            imported = await asyncio.to_thread(
+            live_roster = await asyncio.to_thread(
                 _planned_box_from_pc_state, request.rom, request.pc_state, calculator,
                 abilities,
             )
-            roster_source = str(Path(request.pc_state).expanduser().resolve())
+            if live_roster:
+                imported = live_roster
+                roster_source = str(Path(request.pc_state).expanduser().resolve())
+            elif imported:
+                roster_source = "imported team (the selected save had no readable PC roster)"
         except Exception as exc:
-            raise HTTPException(status_code=400, detail=f"Could not read the live PC box: {exc}") from exc
+            if imported:
+                roster_source = f"imported team (the selected save could not be read: {exc})"
+            else:
+                raise HTTPException(status_code=400, detail=f"Could not read a party from the selected save: {exc}") from exc
     if not imported:
-        raise HTTPException(status_code=400, detail="Import at least one Pokemon set.")
+        raise HTTPException(
+            status_code=400,
+            detail="No usable party was found. Choose an Emerald .sav or mGBA checkpoint, or paste a Showdown team in Party source.",
+        )
     try:
+        healing_mode = request.healing_mode if request.healing_mode in {"none", "bag", "pokemon-center"} else (
+            "pokemon-center" if request.heal_between else "none"
+        )
         result = await asyncio.to_thread(
             _run_calc_gauntlet,
             imported,
@@ -1795,21 +2181,42 @@ async def api_calc_gauntlet(request: GauntletSimRequest) -> dict[str, Any]:
             calculator,
             max_turns=max(1, min(60, request.max_turns)),
             force_enemy_crits=request.crit_safe,
-            heal_between=request.heal_between,
-            optimize_between_fights=request.optimize_between_fights,
+            heal_between=healing_mode != "none",
+            optimize_between_fights=(
+                request.optimize_between_fights and healing_mode == "pokemon-center"
+            ),
+            leveling_policy=request.leveling_policy if not request.hint_mode else "none",
+            deathless_required=request.ruleset in {"hardcore-nuzlocke", "nuzlocke"},
+            max_total_faints=request.max_total_faints,
+            allow_revives=bool(request.allow_revives),
         )
         result["roster_source"] = roster_source
+        result["game_mode"] = mode
+        result["game_label"] = "Pokémon Emerald" if mode == "pokemon-emerald" else "Run & Bun"
+        result["mechanics"] = "Generation III" if mode == "pokemon-emerald" else "Run & Bun ruleset"
         result["nuzlocke_rules"] = {
             "graveyard_box": config.NUZLOCKE_GRAVEYARD_BOX,
             "graveyard_excluded": True,
             "graveyard_items_excluded": True,
+            "ruleset": request.ruleset,
+            "items_in_battle": bool(request.items_in_battle),
+            "revives_allowed": bool(request.allow_revives),
+            "healing_mode": healing_mode,
+            "hint_mode": bool(request.hint_mode),
+            "leveling_policy": request.leveling_policy if not request.hint_mode else "disabled-with-hints",
+            "max_total_faints": request.max_total_faints,
         }
         _GAUNTLET_PROGRESS.update(
-            running=True, stage="cartridge-proof", phase="Replaying the full route in the game",
-            pct=58.0, completed_replays=0, total_replays=2, video_ready=False,
+            running=mode == "run-and-bun", stage="cartridge-proof" if mode == "run-and-bun" else "planner-complete",
+            phase="Replaying the full route in the game" if mode == "run-and-bun" else "Planner route finished",
+            pct=58.0 if mode == "run-and-bun" else 100.0,
+            completed_replays=0, total_replays=2 if mode == "run-and-bun" else 0, video_ready=False,
         )
         requested_trainers = [battles[trainer_id] for trainer_id in request.trainer_ids]
-        playbook = _matching_gauntlet_playbook(requested_trainers)
+        # Cartridge playbooks contain ROM-specific memory checks and inputs. Never
+        # apply a Run & Bun route to a vanilla Emerald request merely because trainer
+        # names or party fingerprints happen to overlap.
+        playbook = _matching_gauntlet_playbook(requested_trainers) if mode == "run-and-bun" else None
         proof = None
         proof_failure = None
         calculator_missed_playbook = bool(
@@ -1846,11 +2253,14 @@ async def api_calc_gauntlet(request: GauntletSimRequest) -> dict[str, Any]:
                 pct=100.0, completed_replays=2, total_replays=2, video_ready=True,
             )
         else:
+            planner_complete = result.get("result") == "route-complete"
             result.update({
                 "proof_complete": False,
-                "emulator_result": "game-proof-required",
-                "proof_error": (
+                "emulator_result": "planner-only" if mode == "pokemon-emerald" else "game-proof-required",
+                "proof_error": None if not planner_complete else (
                     proof_failure or (
+                        "The Emerald planner finished, but this route does not have an executable overworld replay yet."
+                        if mode == "pokemon-emerald" else
                         "No executable playbook exists for this route yet. The planner result "
                         "is saved, but completion still requires two uncut in-game replays."
                     )
@@ -1858,13 +2268,15 @@ async def api_calc_gauntlet(request: GauntletSimRequest) -> dict[str, Any]:
                 "videos": [],
             })
             _GAUNTLET_PROGRESS.update(
-                running=False, stage="rejected", phase="Game proof incomplete",
-                pct=99.0, video_ready=False,
+                running=False,
+                stage="planner-complete" if planner_complete else "stopped",
+                phase="Planner route complete" if planner_complete else "Route stopped",
+                pct=100.0, video_ready=False,
             )
         result["saved_run"] = _save_gauntlet_run(request, result)
         return result
     except Exception:
-        _GAUNTLET_PROGRESS.update(running=False, stage="failed", phase="failed", pct=99.0)
+        _GAUNTLET_PROGRESS.update(running=False, stage="setup-error", phase="Check the route inputs", pct=0.0)
         raise
     finally:
         _progress_finish()
@@ -1882,9 +2294,10 @@ async def api_calc_gauntlet_runs() -> dict[str, Any]:
             "result": result.get("result"), "completed": result.get("completed", 0),
             "queued": result.get("queued", 0), "stopped_reason": result.get("stopped_reason"),
             "emulator_result": result.get("emulator_result"),
-            "emulator_validation": result.get("emulator_validation"),
+            "emulator_validation": _validation_with_recorded_safety(result),
             "videos": result.get("videos") or [], "proof_complete": True,
             "proof_error": None,
+            "game_mode": "run-and-bun",
         })
     for path in sorted(_GAUNTLET_RUNS_DIR.glob("*.json"), reverse=True):
         try:
@@ -1899,10 +2312,11 @@ async def api_calc_gauntlet_runs() -> dict[str, Any]:
             "result": result.get("result"), "completed": result.get("completed", 0),
             "queued": result.get("queued", 0), "stopped_reason": result.get("stopped_reason"),
             "emulator_result": result.get("emulator_result"),
-            "emulator_validation": result.get("emulator_validation"),
+            "emulator_validation": _validation_with_recorded_safety(result),
             "videos": result.get("videos") or [],
             "proof_complete": bool(result.get("proof_complete")),
             "proof_error": result.get("proof_error"),
+            "game_mode": record.get("game_mode") or (record.get("request") or {}).get("game_mode", "run-and-bun"),
         })
     # Keep completed cartridge proof above newer planner-only diagnostics.
     runs.sort(
@@ -2014,12 +2428,13 @@ async def api_complete_calc_flowchart(request: CompleteFlowchartRequest) -> dict
     """
     _FLOWCHART_CANCEL_EVENT = threading.Event()
     _flowchart_progress_reset()
+    mode = normalize_game_mode(request.game_mode)
     calculator = DamageCalculator(default_field=FieldState(
         weather=request.weather,
         is_reflect=request.reflect,
         is_light_screen=request.light_screen,
-    ))
-    battles = load_trainer_battles()
+    ), game_mode=mode)
+    battles = load_trainer_battles_for_mode(mode)
     imported = _parse_imported_sets(request.imports, calculator)
     if not imported:
         raise HTTPException(status_code=400, detail="Import at least one Pokemon set.")
@@ -2054,6 +2469,7 @@ async def api_complete_calc_flowchart(request: CompleteFlowchartRequest) -> dict
             _flowchart_progress_update(meta.get("expanded_nodes", 0), 0, complete=True)
         return {
             "contingency_flowchart": tree,
+            "game_mode": mode,
             "contingency_flowchart_note": (
                 "Expansion stopped early; the explored routes are preserved and remaining tails are marked."
                 if meta.get("cancelled") else
@@ -2071,6 +2487,10 @@ async def api_complete_calc_flowchart(request: CompleteFlowchartRequest) -> dict
 async def api_calc_plan_pdf(request: PlanPdfRequest) -> Response:
     # The flowchart can be enormous and is intentionally a separate interactive view.
     compact_result = dict(request.result)
+    mode = normalize_game_mode(request.game_mode)
+    compact_result.setdefault("game_mode", mode)
+    compact_result.setdefault("game_label", "Pokémon Emerald" if mode == "pokemon-emerald" else "Run & Bun")
+    compact_result.setdefault("mechanics", "Generation III" if mode == "pokemon-emerald" else "Run & Bun ruleset")
     compact_result.pop("contingency_flowchart", None)
     pdf = await asyncio.to_thread(build_battle_plan_pdf, compact_result, request.trainer_label)
     safe_name = re.sub(r"[^A-Za-z0-9_-]+", "-", request.trainer_label).strip("-") or "battle-plan"
@@ -2083,8 +2503,9 @@ async def api_calc_plan_pdf(request: PlanPdfRequest) -> Response:
 
 @app.post("/api/coach/step")
 async def api_coach_step(request: CoachStepRequest) -> dict[str, Any]:
-    calculator = DamageCalculator()
-    battles = load_trainer_battles()
+    mode = normalize_game_mode(request.game_mode)
+    calculator = DamageCalculator(game_mode=mode)
+    battles = load_trainer_battles_for_mode(mode)
     if request.trainer_id < 0 or request.trainer_id >= len(battles):
         raise HTTPException(status_code=404, detail="Trainer not found")
     team = _parse_imported_sets(request.imports, calculator)
@@ -2381,9 +2802,11 @@ def _choice_as_critical(
 
 
 @app.get("/api/result")
-async def api_result() -> dict[str, Any]:
+async def api_result() -> Any:
     if last_result is None:
-        raise HTTPException(status_code=404, detail="No result yet")
+        # A fresh installation has no previous solve. This is an ordinary empty
+        # state, not a failed request (and should not pollute the browser log).
+        return Response(status_code=204)
     data = last_result.to_dict()
     if isinstance(last_result, SearchResult):
         data["battle_plan"] = _battle_plan(last_result, display_state)
@@ -2409,6 +2832,61 @@ def _open_gba_rom(rom_path: Path) -> None:
         status_code=500,
         detail=f"mGBA executable {executable!r} was not found. Set MGBA_EXECUTABLE.",
     )
+
+
+EMERALD_SAMPLE_CALC_IMPORT = """Swampert @ Mystic Water
+Ability: Torrent
+Level: 36
+Adamant Nature
+- Surf
+- Mud Shot
+- Rock Tomb
+- Protect
+
+Gardevoir @ Twisted Spoon
+Ability: Synchronize
+Level: 34
+Modest Nature
+- Psychic
+- Calm Mind
+- Thunderbolt
+- Hypnosis
+
+Breloom @ Miracle Seed
+Ability: Effect Spore
+Level: 33
+Adamant Nature
+- Mach Punch
+- Sky Uppercut
+- Leech Seed
+- Headbutt
+
+Manectric @ Magnet
+Ability: Static
+Level: 33
+Timid Nature
+- Thunderbolt
+- Bite
+- Thunder Wave
+- Quick Attack
+
+Crobat @ Sharp Beak
+Ability: Inner Focus
+Level: 34
+Jolly Nature
+- Aerial Ace
+- Sludge Bomb
+- Confuse Ray
+- Bite
+
+Torkoal @ Charcoal
+Ability: White Smoke
+Level: 33
+Bold Nature
+- Flamethrower
+- Body Slam
+- Protect
+- Smokescreen"""
 
 
 SAMPLE_CALC_IMPORT = """Nidoqueen @ Oran Berry
@@ -2560,6 +3038,10 @@ def _trainer_summary(index: int, battle: TrainerBattle, calculator: DamageCalcul
         "location": battle.location,
         "section": battle.section,
         "is_double": battle.is_double,
+        "required": battle.required,
+        "map_location": battle.map_location,
+        "sublocation": battle.sublocation,
+        "source_row": battle.source_row,
         "party": [_trainer_mon_payload(mon, calculator) for mon in battle.party],
     }
 
@@ -2574,6 +3056,240 @@ def _trainer_mon_payload(mon: TrainerPokemon, calculator: DamageCalculator) -> d
         "nature": mon.nature,
         "moves": list(mon.moves),
         "max_hp": pokemon.max_hp,
+    }
+
+
+def _emerald_level_guidance(
+    team: list[PlannedMember],
+    trainer: TrainerBattle,
+    result: dict[str, Any],
+    requested_cap: int | None,
+    calculator: DamageCalculator,
+) -> dict[str, Any]:
+    enemy_ace = max((mon.level or 1 for mon in trainer.party), default=1)
+    caps_path = Path(__file__).resolve().parents[1] / "data" / "emerald_trainers.json"
+    cap_rows = json.loads(caps_path.read_text(encoding="utf-8")).get("level_caps", [])
+    inferred = next((int(row["ace_level"]) for row in cap_rows if int(row["ace_level"]) >= enemy_ace), 100)
+    cap = int(requested_cap or inferred)
+    over_cap = [member.name for member in team if member.level > cap]
+    current_high = max((member.level for member in team), default=1)
+    won = result.get("result") == "win-line"
+    if won:
+        recommendation = "No level grinding is required by the modeled line."
+        target_min = None
+        target_max = None
+    elif current_high < min(cap, enemy_ace):
+        target_min = min(cap, max(current_high + 1, enemy_ace - 2))
+        target_max = min(cap, max(target_min, enemy_ace))
+        recommendation = f"Try levels {target_min}-{target_max}; do not exceed the level-{cap} cap."
+    else:
+        target_min = None
+        target_max = None
+        recommendation = (
+            "More levels are unlikely to be the main fix within this cap. Change the matchup, moves, "
+            "lead, or party composition before EV training."
+        )
+
+    iv_notes: list[str] = []
+    for member in team:
+        ivs = member.ivs or {}
+        weak = [stat.upper() for stat in ("hp", "def", "spd") if stat in ivs and ivs[stat] <= 5]
+        if weak:
+            iv_notes.append(f"{member.name} has low immutable {'/'.join(weak)} IVs; use a different answer if those stats decide survival.")
+    return {
+        "cap": cap,
+        "cap_source": "Next Emerald Gym Leader's ace level",
+        "enemy_ace": enemy_ace,
+        "over_cap": over_cap,
+        "legal": not over_cap,
+        "target_min": target_min,
+        "target_max": target_max,
+        "recommendation": recommendation,
+        "iv_notes": iv_notes[:3],
+        "ev_note": "EV training is optional and is never the first recommendation; levels, typing, moves, and party swaps are checked first.",
+    }
+
+
+def _emerald_progressive_hints(
+    team: list[PlannedMember],
+    trainer: TrainerBattle,
+    result: dict[str, Any],
+    levels: dict[str, Any],
+    calculator: DamageCalculator,
+) -> list[dict[str, Any]]:
+    weakness_counts: dict[str, int] = {}
+    for mon in trainer.party:
+        species = calculator._species_data(mon.species) or {}  # noqa: SLF001
+        defender_types = list(species.get("types") or [])
+        for attack_type in calculator.type_chart:
+            multiplier = calculator._type_multiplier(attack_type, defender_types)  # noqa: SLF001
+            if multiplier > 1:
+                weakness_counts[attack_type] = weakness_counts.get(attack_type, 0) + 1
+    # Do not arbitrarily hide tied weaknesses. Roxanne, for example, has five
+    # equally useful attacking types; cutting the list to four hid Water, the
+    # most immediately obtainable answer for a Mudkip player.
+    useful_types = [name for name, _ in sorted(weakness_counts.items(), key=lambda row: (-row[1], row[0]))]
+    chosen = [str(mon.get("name") or mon.get("species")) for mon in result.get("team") or []]
+    lead = (result.get("line_search") or {}).get("lead")
+    lead_name = None
+    if isinstance(lead, int) and 0 <= lead < len(chosen):
+        lead_name = chosen[lead]
+    elif isinstance(lead, str) and lead.strip():
+        lead_name = lead.strip()
+    first_turn = (result.get("turns") or [{}])[0]
+    diagnosis = result.get("failure_diagnosis") or {}
+    opening_text = str(first_turn.get("action") or first_turn.get("plan") or levels["recommendation"])
+    if result.get("result") != "win-line":
+        opening_text = str((diagnosis.get("recommended_steps") or [levels["recommendation"]])[0])
+    return [
+        {
+            "level": 1,
+            "title": "Matchup direction",
+            "text": (
+                f"Look for reliable {' / '.join(useful_types)} damage into this party. "
+                f"The current legal cap is {levels['cap']}."
+                if useful_types else f"Prioritize neutral damage and defensive consistency. The current cap is {levels['cap']}."
+            ),
+        },
+        {
+            "level": 2,
+            "title": "What the party needs",
+            "text": (
+                "Bring at least one fast finisher, one safe switch for the opponent's strongest STAB, "
+                "and a backup answer that does not rely on a critical hit or flinch."
+            ),
+        },
+        {
+            "level": 3,
+            "title": "Suggested party",
+            "text": (
+                f"The solver's safest available group is: {', '.join(chosen) or 'no complete legal group found'}."
+                + (f" Start by considering {lead_name}." if lead_name else "")
+            ),
+        },
+        {
+            "level": 4,
+            "title": "Next action" if result.get("result") != "win-line" else "Opening action",
+            "text": opening_text,
+        },
+    ]
+
+
+def _emerald_failure_diagnosis(
+    team: list[PlannedMember],
+    trainer: TrainerBattle,
+    result: dict[str, Any],
+    levels: dict[str, Any],
+    calculator: DamageCalculator,
+) -> dict[str, Any]:
+    """Explain a failed Emerald solve as concrete, legal preparation steps.
+
+    This deliberately distinguishes trainable levels/EVs from immutable IVs and
+    never labels a fight impossible merely because the current import failed.
+    """
+    if result.get("result") == "win-line":
+        return {
+            "status": "ready",
+            "summary": "The current party has a complete modeled line; no grinding is required.",
+            "blockers": [],
+            "recommended_steps": [],
+        }
+
+    enemies = _planned_enemies_for_trainer(trainer, calculator)
+    answers = _threat_answers(team, enemies, calculator)
+    no_clean = [row for row in answers if not row.get("clean")]
+    weakness_counts: dict[str, int] = {}
+    for mon in trainer.party:
+        species = calculator._species_data(mon.species) or {}  # noqa: SLF001
+        for attack_type in calculator.type_chart:
+            if calculator._type_multiplier(attack_type, list(species.get("types") or [])) > 1:  # noqa: SLF001
+                weakness_counts[attack_type] = weakness_counts.get(attack_type, 0) + 1
+    useful_types = [name for name, _ in sorted(weakness_counts.items(), key=lambda row: (-row[1], row[0]))]
+    owned_attack_types: set[str] = set()
+    for member in team:
+        for move_name in member.moves:
+            move = calculator.moves.get(_normalize(move_name)) or {}
+            if int(move.get("basePower") or move.get("power") or 0) > 0:
+                owned_attack_types.add(_normalize(str(move.get("type") or "")))
+    missing_coverage = [name for name in useful_types if _normalize(name) not in owned_attack_types]
+
+    blockers: list[dict[str, str]] = []
+    steps: list[str] = []
+    cap = int(levels.get("cap") or 100)
+    mudkip = next((member for member in team if _normalize(member.species) == "mudkip"), None)
+    knows_water_gun = bool(mudkip and any(_normalize(move) == "watergun" for move in mudkip.moves))
+    is_roxanne = _normalize(trainer.trainer_name) in {"leaderroxanne", "roxanne"}
+    if is_roxanne and mudkip and (mudkip.level < 10 or not knows_water_gun) and cap >= 10:
+        action = "Train Mudkip to level 10 and keep/learn Water Gun, then run the fight again. This stays below the level-15 Roxanne cap."
+        blockers.append({
+            "kind": "move-and-level",
+            "title": "The party is missing its early Rock answer",
+            "evidence": f"Mudkip is level {mudkip.level} and {'already knows' if knows_water_gun else 'does not know'} Water Gun; it learns Water Gun at level 10 in Emerald.",
+            "action": action,
+        })
+        steps.append(action)
+    elif levels.get("target_min"):
+        action = str(levels["recommendation"])
+        blockers.append({
+            "kind": "levels",
+            "title": "The party is below the fight's safe level range",
+            "evidence": f"The opponent's ace is level {levels.get('enemy_ace')}; your highest current level is {max((member.level for member in team), default=1)}.",
+            "action": action,
+        })
+        steps.append(action)
+
+    if missing_coverage:
+        coverage = " / ".join(missing_coverage[:6])
+        action = f"Teach or bring a reliable damaging {missing_coverage[0]}-type move; other useful coverage here is {coverage}."
+        blockers.append({
+            "kind": "coverage",
+            "title": "No current damaging move covers a key weakness",
+            "evidence": f"The imported moves do not include these super-effective damage types: {coverage}.",
+            "action": action,
+        })
+        if not steps:
+            steps.append(action)
+
+    if no_clean:
+        names = ", ".join(str(row.get("enemy")) for row in no_clean[:4])
+        best_bits = []
+        for row in no_clean[:3]:
+            best = row.get("best") or {}
+            best_bits.append(
+                f"{row.get('enemy')}: best current answer {best.get('mon') or 'none'} "
+                f"takes up to {round(float(best.get('incoming') or 1) * 100)}% and deals up to {round(float(best.get('outgoing') or 0) * 100)}%"
+            )
+        action = f"Replace or improve the answer to {names}; re-run after the level/move change before doing EV training."
+        if is_roxanne and knows_water_gun:
+            action = (
+                "Bring a second Rock-type answer—prefer a Grass attacker available before Rustboro—and train it within "
+                f"the level-{cap} cap. Water Gun helps with Geodude, but the current party still has no safe Nosepass backup."
+            )
+        blockers.append({
+            "kind": "survival",
+            "title": "The solver found no clean answer to part of the opposing party",
+            "evidence": "; ".join(best_bits),
+            "action": action,
+        })
+        if action not in steps:
+            steps.append(action)
+
+    iv_notes = list(levels.get("iv_notes") or [])
+    if iv_notes:
+        blockers.append({
+            "kind": "ivs",
+            "title": "IVs cannot be trained in Pokémon Emerald",
+            "evidence": " ".join(iv_notes),
+            "action": "Do not grind IVs. If a damage threshold still fails after legal levels and moves, use a different Pokémon with better natural bulk.",
+        })
+    steps.append("Run the updated party again. Only consider targeted EV training if the new line still misses a specific damage or survival threshold.")
+    return {
+        "status": "needs-preparation",
+        "summary": f"No safe complete line was found for the current party against {trainer.trainer_name}. The fight is not being called impossible; the app found preparation gaps.",
+        "blockers": blockers,
+        "recommended_steps": steps,
+        "level_cap": cap,
+        "ev_policy": "EVs are trainable, but they are a last resort after legal levels, moves, and party composition.",
     }
 
 
@@ -2776,6 +3492,8 @@ def _line_quality_key(result: dict[str, Any]) -> tuple[float, ...]:
     enemy_remaining = sum(
         e.get("hp", 0) / max(1, e.get("max_hp", 1)) for e in result.get("enemies", [])
     )
+    enemy_count = max(1, len(result.get("enemies", [])))
+    enemy_progress = enemy_count - enemy_remaining
     # Sacrifices are already counted as deaths; ranking labeled sacs separately let
     # the search prefer unlabeled deliberate deaths over higher-confidence lines.
     # Confidence is banded to one decimal so a clearly more stable line wins even
@@ -2784,7 +3502,12 @@ def _line_quality_key(result: dict[str, Any]) -> tuple[float, ...]:
     # roster always beats a risky one, and a range/crit-safe line always beats a
     # merely workable clear. Confidence and retained HP only break ties afterward.
     return (
-        win, deathless, no_fragile_answers, range_safe, -deaths,
+        # On incomplete lines, progress must precede survivor count. Otherwise the
+        # search can prefer a truncated early sacrifice (one teammate still alive,
+        # most enemies untouched) over a line that nearly clears the fight. Winning
+        # lines all have identical full progress, so the Nuzlocke safety ordering
+        # below remains unchanged for actual clears.
+        win, enemy_progress, deathless, no_fragile_answers, range_safe, -deaths,
         -float(fragile["events"]), float(fragile["minimum_hp_ratio"]),
         confidence, remaining, -enemy_remaining,
     )
@@ -2919,6 +3642,216 @@ def _candidate_team_indices(
     # User order baseline (what the old behavior would have used).
     add(tuple(sorted(range(min(team_size, len(imported))))))
     return candidates
+
+
+def _route_coverage_candidates(
+    imported: list[PlannedMember],
+    trainers: list[TrainerBattle],
+    calculator: DamageCalculator,
+    *,
+    force_enemy_crits: bool,
+    leveling_policy: str,
+    team_size: int = 6,
+    beam_width: int = 96,
+) -> tuple[list[tuple[int, ...]], dict[str, Any]]:
+    """Deterministically pair Pokémon that answer several route threats.
+
+    Each member receives a normalized answer score against every opposing Pokémon.
+    A bounded beam then builds six-member teams by rewarding primary coverage,
+    a second safe answer, and members that cover threats across multiple trainers.
+    This is faster than simulating all nC6 teams while remaining stable across runs.
+    """
+    if not imported or not trainers:
+        return [], {"policy": "paired-route-coverage", "candidates": 0}
+
+    foe_scores: list[list[float]] = []
+    foe_trainers: list[int] = []
+    member_good_answers = [0 for _ in imported]
+    member_trainer_answers = [set() for _ in imported]
+    for trainer_index, trainer in enumerate(trainers):
+        preview = imported
+        if leveling_policy == "boss-cap":
+            ace = max((mon.level or 1 for mon in trainer.party), default=1)
+            preview = [_emerald_rare_candy_raise(member, ace, calculator) for member in imported]
+        enemies = _planned_enemies_for_trainer(trainer, calculator)
+        for enemy in enemies:
+            ranked = _rank_calc_answers(
+                _clone_calc_team(preview), enemy, calculator,
+                force_enemy_crits=force_enemy_crits,
+                enemy_will_intimidate=True,
+            )
+            count = max(1, len(ranked) - 1)
+            scores = [0.0 for _ in imported]
+            for rank, (_raw, member_index, _action, _choice, dies) in enumerate(ranked):
+                normalized = max(0.0, 1.0 - rank / count)
+                if dies:
+                    normalized *= 0.2
+                scores[member_index] = normalized
+                if normalized >= 0.65:
+                    member_good_answers[member_index] += 1
+                    member_trainer_answers[member_index].add(trainer_index)
+            foe_scores.append(scores)
+            foe_trainers.append(trainer_index)
+
+    score_cache: dict[tuple[int, ...], tuple[float, ...]] = {}
+
+    def coverage_key(indices: tuple[int, ...]) -> tuple[float, ...]:
+        cached = score_cache.get(indices)
+        if cached is not None:
+            return cached
+        primary = 0.0
+        backup = 0.0
+        strong_foes = 0
+        trainer_covered: set[int] = set()
+        for foe_index, scores in enumerate(foe_scores):
+            answers = sorted((scores[index] for index in indices), reverse=True)
+            best = answers[0] if answers else 0.0
+            second = answers[1] if len(answers) > 1 else 0.0
+            primary += best
+            backup += second
+            if best >= 0.65:
+                strong_foes += 1
+                trainer_covered.add(foe_trainers[foe_index])
+        multi_route = sum(
+            max(0, len(member_trainer_answers[index]) - 1)
+            for index in indices
+        )
+        multi_foe = sum(max(0, member_good_answers[index] - 1) for index in indices)
+        # Tuple order expresses policy: cover every trainer first, then every foe,
+        # then reward compact multi-fight answers and reliable backups.
+        key = (
+            float(len(trainer_covered)), float(strong_foes),
+            round(primary, 6), float(multi_route), float(multi_foe),
+            round(backup, 6),
+        )
+        score_cache[indices] = key
+        return key
+
+    beam: list[tuple[int, ...]] = [tuple()]
+    for _size in range(1, min(team_size, len(imported)) + 1):
+        expanded = {
+            tuple(sorted((*indices, outsider)))
+            for indices in beam
+            for outsider in range(len(imported))
+            if outsider not in indices
+        }
+        beam = sorted(
+            expanded,
+            key=lambda indices: (coverage_key(indices), tuple(-index for index in indices)),
+            reverse=True,
+        )[:beam_width]
+
+    # Keep the complete bounded beam.  Thirty-two candidates was too narrow for
+    # complementary late-route teams: a member that is merely adequate across the
+    # route can be the exact bridge that preserves the Wallace answer through Drake.
+    # The downstream cheap scorer still refines only its strongest bounded subset.
+    candidates = beam[: min(beam_width, len(beam))]
+    best = candidates[0] if candidates else tuple()
+    member_payload = sorted((
+        {
+            "index": index,
+            "pokemon": member.name,
+            "foes_answered": member_good_answers[index],
+            "trainers_answered": len(member_trainer_answers[index]),
+        }
+        for index, member in enumerate(imported)
+    ), key=lambda row: (-row["trainers_answered"], -row["foes_answered"], row["index"]))
+    return candidates, {
+        "policy": "paired-route-coverage",
+        "beam_width": beam_width,
+        "candidates": len(candidates),
+        "opponents_scored": len(foe_scores),
+        "best_indices": list(best),
+        "best_score": list(coverage_key(best)) if best else [],
+        "multi_fight_answers": member_payload,
+    }
+
+
+def _future_route_protected_slots(
+    team: list[PlannedMember],
+    future_trainers: list[TrainerBattle],
+    calculator: DamageCalculator,
+    *,
+    force_enemy_crits: bool,
+    limit: int = 3,
+) -> set[int]:
+    """Return the party slots with the most answer coverage in later fights."""
+    if not future_trainers:
+        return set()
+    points = {member.slot: 0.0 for member in team if member.hp > 0}
+    for trainer in future_trainers:
+        for enemy in _planned_enemies_for_trainer(trainer, calculator):
+            ranked = _rank_calc_answers(
+                _clone_calc_team(team), enemy, calculator,
+                force_enemy_crits=force_enemy_crits,
+                enemy_will_intimidate=True,
+            )
+            for rank, (_score, member_index, _action, _choice, dies) in enumerate(ranked[:4]):
+                member = team[member_index]
+                if member.hp <= 0:
+                    continue
+                points[member.slot] = points.get(member.slot, 0.0) + max(0.0, 4.0 - rank) * (0.25 if dies else 1.0)
+    ordered = sorted(points, key=lambda slot: (-points[slot], slot))
+    return set(ordered[:limit])
+
+
+def _future_preserving_quality(protected_slots: set[int]):
+    """Build a deterministic line key that saves later-route answers on ties."""
+    def quality(result: dict[str, Any]) -> tuple[float, ...]:
+        base = _line_quality_key(result)
+        team = result.get("team") or []
+        total_deaths = sum(1 for member in team if int(member.get("hp") or 0) <= 0)
+        protected_deaths = sum(
+            1 for member in team
+            if member.get("slot") in protected_slots and int(member.get("hp") or 0) <= 0
+        )
+        return base[:3] + (-float(total_deaths), -float(protected_deaths)) + base[3:]
+    return quality
+
+
+def _search_future_preserving_line(
+    team: list[PlannedMember],
+    trainer: TrainerBattle,
+    calculator: DamageCalculator,
+    *,
+    max_turns: int,
+    force_enemy_crits: bool,
+    protected_slots: set[int],
+    budget: int = 120,
+    focused_beam: bool = False,
+) -> dict[str, Any]:
+    """Search the normal best line and a later-route-preserving variant.
+
+    Keeping the baseline prevents future-value weighting from getting trapped in
+    an incomplete local optimum. Both passes are deterministic, and their total
+    budget remains bounded.
+    """
+    baseline_budget = max(40, budget)
+    protected_budget = max(30, budget // 2)
+    baseline = _search_best_line(
+        _clone_calc_team(team), trainer, calculator,
+        max_turns=max_turns, force_enemy_crits=force_enemy_crits,
+        budget=baseline_budget, focused_beam=focused_beam,
+    )
+    seed = {
+        int(turn): slot
+        for turn, slot in ((baseline.get("line_search") or {}).get("overrides") or {}).items()
+    } or None
+    protected = _search_best_line(
+        _clone_calc_team(team), trainer, calculator,
+        max_turns=max_turns, force_enemy_crits=force_enemy_crits,
+        budget=protected_budget, seed_overrides=seed,
+        quality_fn=_future_preserving_quality(protected_slots),
+    )
+    quality = _future_preserving_quality(protected_slots)
+    winner = protected if quality(protected) > quality(baseline) else baseline
+    winner["future_answer_protection"] = {
+        "protected_slots": sorted(protected_slots),
+        "baseline_budget": baseline_budget,
+        "protected_budget": protected_budget,
+        "policy": "baseline-plus-future-preserving-pass",
+    }
+    return winner
 
 
 def _rank_answer_coverage(
@@ -3406,6 +4339,7 @@ def _alternate_answer_lines(
     *,
     max_turns: int,
     force_enemy_crits: bool,
+    lightweight: bool = False,
 ) -> list[dict[str, Any]]:
     """Find backups by banning each primary answer for the entire rerun."""
     if primary.get("result") != "win-line":
@@ -3416,9 +4350,16 @@ def _alternate_answer_lines(
         pool = [member for member in available if _normalize(member.name) != _normalize(forbidden)]
         if len(pool) < (2 if trainer.is_double else 1):
             continue
-        alternate = _run_text_calc_sim_with_team_select(
-            pool, trainer, calculator, max_turns=max_turns,
-            force_enemy_crits=force_enemy_crits,
+        alternate = (
+            _search_best_line(
+                pool[:6], trainer, calculator, max_turns=max_turns,
+                force_enemy_crits=force_enemy_crits, budget=70,
+            )
+            if lightweight and len(pool) <= 6 else
+            _run_text_calc_sim_with_team_select(
+                pool, trainer, calculator, max_turns=max_turns,
+                force_enemy_crits=force_enemy_crits,
+            )
         )
         ending_team = list(alternate.get("team") or [])
         selected = [str(member.get("name") or "") for member in ending_team]
@@ -3456,6 +4397,8 @@ def _search_best_line(
     forced_lead: int | None = None,
     budget: int = 120,
     seed_overrides: dict[int, int | None] | None = None,
+    quality_fn: Any | None = None,
+    focused_beam: bool = False,
 ) -> dict[str, Any]:
     """Local search over lines: replay the sim while forcing different switch
     decisions at the lowest-confidence turns and keep the best line found."""
@@ -3463,6 +4406,7 @@ def _search_best_line(
     # Per-lead decision caches: state signatures do not encode species, so alternate
     # opening leads must never share cached tactical decisions.
     decision_caches: dict[int | None, dict] = {}
+    quality = quality_fn or _line_quality_key
 
     def run(
         overrides: dict[int, int | None] | None,
@@ -3486,7 +4430,7 @@ def _search_best_line(
     best = run(None, best_lead)
     best_overrides: dict[int, int | None] = {}
     best_move_overrides: dict[int, str] = {}
-    best_key = _line_quality_key(best)
+    best_key = quality(best)
     # A lead is a full-battle strategy, not a cosmetic choice. Try every living team
     # member when the caller did not pin one, spending only one simulation per opening.
     if forced_lead is None:
@@ -3495,14 +4439,14 @@ def _search_best_line(
                 continue
             candidate = run(None, lead)
             budget -= 1
-            key = _line_quality_key(candidate)
+            key = quality(candidate)
             if key > best_key:
                 best, best_key, best_lead = candidate, key, lead
             if budget <= 0:
                 break
     if seed_overrides:
         seeded = run(seed_overrides, best_lead)
-        seeded_key = _line_quality_key(seeded)
+        seeded_key = quality(seeded)
         if seeded_key > best_key:
             best, best_key, best_overrides = seeded, seeded_key, dict(seed_overrides)
     improved = True
@@ -3550,13 +4494,14 @@ def _search_best_line(
                     break
                 budget -= 1
                 candidate = run(overrides, best_lead, best_move_overrides)
-                key = _line_quality_key(candidate)
+                key = quality(candidate)
                 if key > best_key:
                     best, best_key, best_overrides = candidate, key, overrides
                     improved = True
                     break
             if improved or budget <= 0:
                 break
+
         if improved or budget <= 0:
             continue
         # Alternate-move search at the same confidence sinks. This is what lets the
@@ -3576,13 +4521,81 @@ def _search_best_line(
                 candidate_moves = {**best_move_overrides, site: move_name}
                 budget -= 1
                 candidate = run(best_overrides, best_lead, candidate_moves)
-                key = _line_quality_key(candidate)
+                key = quality(candidate)
                 if key > best_key:
                     best, best_key, best_move_overrides = candidate, key, candidate_moves
                     improved = True
                     break
             if improved or budget <= 0:
                 break
+    # A greedy hill-climb cannot cross a temporarily worse pivot to reach a safer
+    # two-pivot line. On final user-facing searches, explore a small deterministic
+    # beam around the turns where a sacrifice actually occurred.
+    focused_variants = 0
+    if focused_beam and any(int(member.get("hp") or 0) <= 0 for member in best.get("team") or []):
+        beam: list[tuple[dict[int, int | None], dict[str, Any]]] = [(dict(best_overrides), best)]
+        seen_overrides = {tuple(sorted(best_overrides.items()))}
+
+        def sacrifice_sites(result: dict[str, Any]) -> list[int]:
+            sites: list[int] = []
+            for row in result.get("turns") or []:
+                action = str(row.get("action") or "")
+                try:
+                    hp = int(str(row.get("your_hp") or "0/1").split("/", 1)[0])
+                except ValueError:
+                    hp = 0
+                if "Tactical sac" not in action and hp > 0:
+                    continue
+                turn_no = int(row.get("turn") or 0)
+                for site in (turn_no, turn_no - 1, turn_no - 2):
+                    if site >= 1 and site not in sites:
+                        sites.append(site)
+            return sites[:8]
+
+        def outcome_signature(result: dict[str, Any]) -> tuple[Any, ...]:
+            return (
+                result.get("result"),
+                tuple(int(member.get("hp") or 0) for member in result.get("team") or []),
+                tuple(int(enemy.get("hp") or 0) for enemy in result.get("enemies") or []),
+                tuple(str(row.get("action") or "") for row in result.get("turns") or []),
+            )
+
+        for _depth in range(2):
+            expanded = list(beam)
+            for overrides, result in beam:
+                for site in sacrifice_sites(result)[:5]:
+                    for slot in (None, *range(len(team))):
+                        candidate_overrides = {**overrides, site: slot}
+                        override_key = tuple(sorted(candidate_overrides.items()))
+                        if override_key in seen_overrides:
+                            continue
+                        seen_overrides.add(override_key)
+                        candidate = run(candidate_overrides, best_lead, best_move_overrides)
+                        focused_variants += 1
+                        expanded.append((candidate_overrides, candidate))
+            expanded.sort(key=lambda item: quality(item[1]), reverse=True)
+            next_beam: list[tuple[dict[int, int | None], dict[str, Any]]] = []
+            seen_outcomes: set[tuple[Any, ...]] = set()
+            for result_kind in ("win-line", "partial-line"):
+                quota = 8
+                for item in expanded:
+                    if item[1].get("result") != result_kind:
+                        continue
+                    signature = outcome_signature(item[1])
+                    if signature in seen_outcomes:
+                        continue
+                    seen_outcomes.add(signature)
+                    next_beam.append(item)
+                    quota -= 1
+                    if quota <= 0:
+                        break
+            beam = next_beam[:16]
+            if not beam:
+                break
+            candidate_overrides, candidate = max(beam, key=lambda item: quality(item[1]))
+            candidate_key = quality(candidate)
+            if candidate_key > best_key:
+                best, best_key, best_overrides = candidate, candidate_key, candidate_overrides
     if best_overrides or best_move_overrides or best_lead != forced_lead:
         best["line_search"] = {
             "overrides": {str(turn): slot for turn, slot in best_overrides.items()},
@@ -3593,6 +4606,13 @@ def _search_best_line(
                 + ("It also forced non-default switch decisions to stabilize the line." if best_overrides else "")
                 + (" It selected non-default tactical moves at the weakest turns." if best_move_overrides else "")
             ).strip(),
+        }
+    if focused_variants:
+        best.setdefault("line_search", {})["focused_switch_beam"] = {
+            "depth": 2,
+            "width": 16,
+            "variants_tested": focused_variants,
+            "policy": "deterministic-sacrifice-site-beam",
         }
     return best
 
@@ -5475,6 +6495,7 @@ def _run_text_calc_sim_once(
     last_switch_enemy_hp = 0
     switches_without_progress = 0
     pending_events: list[str] = []
+    last_control_action: tuple[int, int, str] | None = None
     if active_index is not None and enemies:
         pending_events += _apply_entry_ability(enemies[0], team[active_index], calculator)
         pending_events += _apply_entry_ability(team[active_index], enemies[0], calculator)
@@ -5493,12 +6514,24 @@ def _run_text_calc_sim_once(
     for turn in range(1, max_turns + 1):
         if active_index is None or not any(enemy.alive for enemy in enemies):
             break
-        # State entering this turn — the memo key the contingency tree dedupes on.
-        current_entry_sig = _calc_state_signature(team, enemies, active_index, enemy_index)
         enemy = enemies[enemy_index]
         active = team[active_index]
+        if enemy.status == "sleep" and enemy.sleep_turns <= 0:
+            enemy.status = None
+        if active.status == "sleep" and active.sleep_turns <= 0:
+            active.status = None
+        # State entering this turn — the memo key the contingency tree dedupes on.
+        current_entry_sig = _calc_state_signature(team, enemies, active_index, enemy_index)
         if not active.alive:
-            active_index = _best_calc_answer(team, enemy, calculator, force_enemy_crits=force_enemy_crits)
+            # A faint never ends a battle while another party member is alive. The
+            # replacement is mandatory even when every remaining answer is unsafe;
+            # refusing to pick one truncated failed lines and let the search hide the
+            # actual blackout (or miss a last-ditch clear).
+            active_index = _best_calc_answer(
+                team, enemy, calculator,
+                force_enemy_crits=force_enemy_crits,
+                allow_sac=True,
+            )
             if active_index is None:
                 break
             active = team[active_index]
@@ -5676,6 +6709,31 @@ def _run_text_calc_sim_once(
                 (current_entry_sig,),
                 lambda: _best_player_action(active, enemy, team, calculator),
             )
+        # Do not let a one-Pokémon fight loop forever on Growl/Mud-Slap while the
+        # opponent immediately restores the same stage with Howl. A repeated
+        # zero-damage control click against the same target yields to the best real
+        # damaging move on the next turn. Switching or changing targets resets it.
+        control_key = (active_index, enemy_index, _normalize(action.move_name))
+        if action.damage is None or action.damage.max_damage <= 0:
+            if last_control_action == control_key:
+                damaging = _ranked_known_damage(
+                    calculator, active.calc_set(), enemy.calc_set(), active.known_moves
+                )
+                if damaging:
+                    damage = damaging[0]
+                    action = PlayerAction(
+                        "move", damage.move_name,
+                        score=damage.min_percent * 100.0,
+                        damage=damage,
+                        reason="make progress after a repeated control turn",
+                    )
+                    last_control_action = None
+                else:
+                    last_control_action = control_key
+            else:
+                last_control_action = control_key
+        else:
+            last_control_action = None
         if not action.move_name:
             _emit(_calc_turn(turn, enemy, active, "Planner blocked.", "No reliable imported move for this matchup.", [], "blocked", confidence * 0.35))
             break
@@ -5793,7 +6851,7 @@ def _run_text_calc_sim_once(
         }
         risks = _crit_mode_notes(force_enemy_crits) + _choice_risks(choice, active, enemy, calculator) + _branch_risk_notes(choices, active, enemy, calculator)
         enemy_first = _enemy_moves_before_player(enemy, active, choice.move_name if choice else "", action.move_name, calculator)
-        if enemy_first and _choice_kills_current(choice, active):
+        if enemy_first and not _will_skip_turn(enemy) and _choice_kills_current(choice, active):
             sac_index = _decide(
                 "sac_target",
                 (current_entry_sig, choice.move_name if choice else None, force_enemy_crits),
@@ -5901,7 +6959,12 @@ def _run_text_calc_sim_once(
             pko = _player_ko_chance(active, enemy, action.move_name)
             _real = _real + (1.0 - _real) * pko
             _best = _best + (1.0 - _best) * pko
-        if choice is not None and not enemy_first and _choice_kills_current(choice, active):
+        if (
+            choice is not None
+            and not enemy_first
+            and not _will_skip_turn(enemy)
+            and _choice_kills_current(choice, active)
+        ):
             # Planned trade: the printed line already has the active mon acting and
             # then fainting, so its own KO branch is the plan, not a deviation.
             # Charge the same flat strategic cost as a stay-in sacrifice instead of
@@ -6151,10 +7214,12 @@ def _clone_calc_team(team: list[PlannedMember]) -> list[PlannedMember]:
     ]
 
 
-def _clear_between_battle_effects(member: PlannedMember, *, heal: bool) -> PlannedMember:
+def _clear_between_battle_effects(
+    member: PlannedMember, *, heal: bool, revive_fainted: bool = False
+) -> PlannedMember:
     """Apply the game's between-battle rules without restoring consumed held items."""
     clone = _clone_calc_team([member])[0]
-    if heal:
+    if heal and (clone.hp > 0 or revive_fainted):
         clone.hp = clone.max_hp
         clone.status = None
         clone.sleep_turns = 0
@@ -6172,6 +7237,122 @@ def _clear_between_battle_effects(member: PlannedMember, *, heal: bool) -> Plann
     clone.turns_out = 0
     clone.ability_on = True
     return clone
+
+
+_EMERALD_LEVEL_EVOLUTIONS: dict[str, tuple[int, str]] = {
+    "whismur": (20, "loudred"),
+    "loudred": (40, "exploud"),
+    "slugma": (38, "magcargo"),
+    "numel": (33, "camerupt"),
+    "tentacool": (30, "tentacruel"),
+    "oddish": (21, "gloom"),
+    "vibrava": (45, "flygon"),
+}
+
+_EMERALD_RARE_CANDY_FAMILY: dict[str, str] = {
+    "loudred": "whismur",
+    "exploud": "whismur",
+    "magcargo": "slugma",
+    "camerupt": "numel",
+    "tentacruel": "tentacool",
+    "gloom": "oddish",
+    "flygon": "vibrava",
+}
+
+# Full four-move choices at the relevant level prompts. These are limited to moves
+# the captured Pokémon would learn while consuming Rare Candies; TMs, tutors, and
+# Move Reminder access are deliberately not invented.
+_EMERALD_RARE_CANDY_MOVESETS: dict[str, tuple[tuple[int, tuple[str, ...]], ...]] = {
+    "swampert": (
+        (46, ("Protect", "Ice Beam", "Mud-Slap", "Surf")),
+        (52, ("Protect", "Ice Beam", "Earthquake", "Surf")),
+    ),
+    "banette": ((48, ("Feint Attack", "Night Shade", "Will-O-Wisp", "Shadow Ball")),),
+    "linoone": (
+        (41, ("Strength", "Slash", "Rock Smash", "Headbutt")),
+        (47, ("Strength", "Slash", "Rest", "Headbutt")),
+        (53, ("Strength", "Slash", "Rest", "Belly Drum")),
+    ),
+    "dustox": (
+        (34, ("Protect", "Moonlight", "Psybeam", "Silver Wind")),
+        (38, ("Protect", "Moonlight", "Silver Wind", "Toxic")),
+    ),
+    "nuzleaf": (
+        (31, ("Fake Out", "Feint Attack", "Growth", "Nature Power")),
+        (49, ("Fake Out", "Feint Attack", "Nature Power", "Extrasensory")),
+    ),
+    "tentacool": (
+        (25, ("Acid", "Supersonic", "Waterfall", "Bubble Beam")),
+        (38, ("Acid", "Barrier", "Waterfall", "Bubble Beam")),
+        (47, ("Acid", "Screech", "Waterfall", "Bubble Beam")),
+        (55, ("Acid", "Screech", "Waterfall", "Hydro Pump")),
+    ),
+    "golbat": (
+        (35, ("Air Cutter", "Wing Attack", "Astonish", "Bite")),
+        (49, ("Air Cutter", "Wing Attack", "Poison Fang", "Bite")),
+    ),
+    "oddish": (
+        (35, ("Poison Powder", "Stun Spore", "Sleep Powder", "Moonlight")),
+        (44, ("Stun Spore", "Sleep Powder", "Moonlight", "Petal Dance")),
+    ),
+    "castform": ((30, ("Weather Ball", "Powder Snow", "Rain Dance", "Sunny Day")),),
+    "whismur": (
+        (29, ("Uproar", "Astonish", "Howl", "Stomp")),
+        (37, ("Uproar", "Astonish", "Stomp", "Screech")),
+        (40, ("Uproar", "Stomp", "Screech", "Hyper Beam")),
+    ),
+    "slugma": (
+        (36, ("Harden", "Amnesia", "Flamethrower", "Rock Throw")),
+        (48, ("Harden", "Amnesia", "Flamethrower", "Rock Slide")),
+    ),
+    "numel": (
+        (33, ("Take Down", "Amnesia", "Ember", "Rock Slide")),
+        (37, ("Take Down", "Amnesia", "Earthquake", "Rock Slide")),
+        (45, ("Eruption", "Amnesia", "Earthquake", "Rock Slide")),
+    ),
+    "hariyama": (
+        (44, ("Endure", "Knock Off", "Smelling Salts", "Belly Drum")),
+        (51, ("Endure", "Seismic Toss", "Smelling Salts", "Belly Drum")),
+        (55, ("Endure", "Seismic Toss", "Reversal", "Belly Drum")),
+    ),
+}
+
+
+def _emerald_rare_candy_raise(
+    member: PlannedMember, target_level: int, calculator: DamageCalculator
+) -> PlannedMember:
+    """Apply legal level gains, including automatic Gen-III level evolutions."""
+    clone = _clone_calc_team([member])[0]
+    if target_level <= clone.level:
+        return clone
+    species = _normalize(clone.species)
+    while species in _EMERALD_LEVEL_EVOLUTIONS:
+        evolution_level, evolved_species = _EMERALD_LEVEL_EVOLUTIONS[species]
+        if target_level < evolution_level:
+            break
+        species = evolved_species
+    species_data = calculator._species_data(species)  # noqa: SLF001
+    if not species_data:
+        return clone
+    max_hp = calculator._stat(  # noqa: SLF001
+        species_data, "hp", target_level, clone.nature, clone.evs, clone.ivs
+    )
+    moves = clone.known_moves
+    move_family = _EMERALD_RARE_CANDY_FAMILY.get(
+        _normalize(member.species), _normalize(member.species)
+    )
+    for learn_level, learned_moves in _EMERALD_RARE_CANDY_MOVESETS.get(move_family, ()):
+        if member.level < learn_level <= target_level:
+            moves = learned_moves
+    was_fainted = clone.hp <= 0
+    return replace(
+        clone,
+        species=species,
+        level=target_level,
+        max_hp=max_hp,
+        hp=0 if was_fainted else max_hp,
+        moves=tuple(moves),
+    )
 
 
 def _team_from_calc_result(result: dict[str, Any], source: list[PlannedMember]) -> list[PlannedMember]:
@@ -6228,7 +7409,10 @@ def _planned_box_from_pc_state(
     )
     decoded = list(scan.party) + [
         mon for mon in scan.roster
-        if not config.NUZLOCKE_GRAVEYARD_BOX or mon.box != config.NUZLOCKE_GRAVEYARD_BOX
+        if (
+            (calculator.game_mode != "pokemon-emerald" or mon.box < 13)
+            and (not config.NUZLOCKE_GRAVEYARD_BOX or mon.box != config.NUZLOCKE_GRAVEYARD_BOX)
+        )
     ]
     planned: list[PlannedMember] = []
     ability_by_species = {
@@ -6341,6 +7525,10 @@ def _run_calc_gauntlet(
     force_enemy_crits: bool,
     heal_between: bool,
     optimize_between_fights: bool = True,
+    leveling_policy: str = "none",
+    deathless_required: bool = False,
+    max_total_faints: int = 0,
+    allow_revives: bool = False,
 ) -> dict[str, Any]:
     """Run the route in order, reselecting from the box on legal Center visits."""
     _GAUNTLET_PROGRESS.update(
@@ -6350,8 +7538,246 @@ def _run_calc_gauntlet(
     )
     roster = _clone_calc_team(imported)
     working = _clone_calc_team(imported)
+    route_team_selection: dict[str, Any] | None = None
+    # Bag-healing gauntlets (notably the Emerald League) must carry one party for
+    # the whole route. Selecting six solely for fight one produces a misleading
+    # Sidney-specialist roster that may have no answer to Phoebe or Wallace. Seed
+    # the fixed party from candidates proposed for every trainer, then score each
+    # candidate over the complete route with between-fight healing and legal level
+    # caps. The expensive per-fight line search still runs below for the winner.
+    if (
+        heal_between
+        and not optimize_between_fights
+        and len(roster) > 6
+        and trainers
+    ):
+        coverage_candidates, coverage_report = _route_coverage_candidates(
+            roster, trainers, calculator,
+            force_enemy_crits=force_enemy_crits,
+            leveling_policy=leveling_policy,
+        )
+        route_candidates: list[tuple[int, ...]] = list(coverage_candidates)
+        for route_trainer in trainers:
+            candidate_roster = roster
+            if leveling_policy == "boss-cap":
+                preview_level = max((mon.level or 1 for mon in route_trainer.party), default=1)
+                candidate_roster = [
+                    _emerald_rare_candy_raise(member, preview_level, calculator)
+                    for member in roster
+                ]
+            for candidate in _candidate_team_indices(
+                candidate_roster, route_trainer, calculator,
+                force_enemy_crits=force_enemy_crits,
+            ):
+                if candidate not in route_candidates:
+                    route_candidates.append(candidate)
+
+        route_score_cache: dict[tuple[int, ...], tuple[float, ...]] = {}
+
+        def route_candidate_key(indices: tuple[int, ...]) -> tuple[float, ...]:
+            cached = route_score_cache.get(indices)
+            if cached is not None:
+                return cached
+            team = _clone_calc_team([roster[index] for index in indices])
+            deathless_wins = 0
+            wins = 0
+            total_faints = 0
+            progress = 0.0
+            remaining = 0.0
+            for route_index, route_trainer in enumerate(trainers):
+                enemy_ace = max((mon.level or 1 for mon in route_trainer.party), default=1)
+                party_high = max((member.level for member in team), default=1)
+                target_level = (
+                    enemy_ace if leveling_policy == "boss-cap"
+                    else party_high if leveling_policy == "party-max"
+                    else None
+                )
+                if target_level is not None:
+                    team = [
+                        _emerald_rare_candy_raise(member, target_level, calculator)
+                        for member in team
+                    ]
+                quick = _run_text_calc_sim_once(
+                    _clone_calc_team(team), route_trainer, calculator,
+                    max_turns=max_turns, force_enemy_crits=force_enemy_crits,
+                    compute_item_recs=False,
+                )
+                alive = all(int(member.get("hp") or 0) > 0 for member in quick.get("team") or [])
+                won = quick.get("result") == "win-line"
+                alive_before = {
+                    member.slot for member in team if member.hp > 0
+                }
+                new_faints = sum(
+                    1 for member in quick.get("team") or []
+                    if member.get("slot") in alive_before and int(member.get("hp") or 0) <= 0
+                )
+                total_faints += new_faints
+                wins += int(won)
+                deathless_wins += int(won and alive)
+                enemies = quick.get("enemies") or []
+                progress += sum(
+                    1.0 - int(enemy.get("hp") or 0) / max(1, int(enemy.get("max_hp") or 1))
+                    for enemy in enemies
+                )
+                remaining += sum(
+                    int(member.get("hp") or 0) / max(1, int(member.get("max_hp") or 1))
+                    for member in quick.get("team") or []
+                )
+                team = [
+                    _clear_between_battle_effects(member, heal=True)
+                    for member in _team_from_calc_result(quick, team)
+                ]
+                if not won or total_faints > max_total_faints or not any(member.alive for member in team):
+                    break
+            route_complete = int(wins == len(trainers) and total_faints <= max_total_faints)
+            score = (
+                float(route_complete), float(wins), -float(total_faints),
+                float(deathless_wins), progress, remaining,
+            )
+            route_score_cache[indices] = score
+            return score
+
+        best_route_indices = max(route_candidates, key=route_candidate_key)
+        # The per-trainer seeds can omit a route specialist. Hill-climb swaps against
+        # the aggregate route score so, for example, a Phoebe answer is not discarded
+        # merely because it contributes less damage against Sidney.
+        route_swap_budget = 120
+        while route_swap_budget > 0:
+            current_key = route_candidate_key(best_route_indices)
+            best_trial = best_route_indices
+            for slot in range(len(best_route_indices)):
+                for outsider in range(len(roster)):
+                    if outsider in best_route_indices:
+                        continue
+                    trial = tuple(sorted(
+                        set(best_route_indices) - {best_route_indices[slot]} | {outsider}
+                    ))
+                    trial_key = route_candidate_key(trial)
+                    route_swap_budget -= 1
+                    if trial_key > route_candidate_key(best_trial):
+                        best_trial = trial
+                    if route_swap_budget <= 0:
+                        break
+                if route_swap_budget <= 0:
+                    break
+            if route_candidate_key(best_trial) <= current_key:
+                break
+            best_route_indices = best_trial
+            if best_route_indices not in route_candidates:
+                route_candidates.append(best_route_indices)
+
+        # Refine only the strongest cheap candidates with the real line search.
+        # This keeps selection fast while preventing a greedy Drake line from
+        # sacrificing the Manectric that is the best answer to Wallace.
+        refinement_pool = sorted(
+            route_score_cache,
+            key=lambda indices: (route_candidate_key(indices), tuple(-i for i in indices)),
+            reverse=True,
+        )[:12]
+        refinement_cache: dict[tuple[int, ...], tuple[float, ...]] = {}
+
+        def refined_route_key(indices: tuple[int, ...]) -> tuple[float, ...]:
+            cached = refinement_cache.get(indices)
+            if cached is not None:
+                return cached
+            team = _clone_calc_team([roster[index] for index in indices])
+            wins = 0
+            total_deaths = 0
+            deathless_wins = 0
+            progress = 0.0
+            remaining = 0.0
+            for route_index, route_trainer in enumerate(trainers):
+                enemy_ace = max((mon.level or 1 for mon in route_trainer.party), default=1)
+                party_high = max((member.level for member in team if member.hp > 0), default=1)
+                target_level = (
+                    enemy_ace if leveling_policy == "boss-cap"
+                    else party_high if leveling_policy == "party-max"
+                    else None
+                )
+                if target_level is not None:
+                    team = [
+                        _emerald_rare_candy_raise(member, target_level, calculator)
+                        for member in team
+                    ]
+                alive_slots = {member.slot for member in team if member.hp > 0}
+                protected_slots = _future_route_protected_slots(
+                    team, trainers[route_index + 1:], calculator,
+                    force_enemy_crits=force_enemy_crits,
+                )
+                searched = _search_future_preserving_line(
+                    _clone_calc_team(team), route_trainer, calculator,
+                    max_turns=max_turns, force_enemy_crits=force_enemy_crits,
+                    budget=70, protected_slots=protected_slots,
+                )
+                won = searched.get("result") == "win-line"
+                ending = _team_from_calc_result(searched, team)
+                new_deaths = sum(
+                    1 for member in ending
+                    if member.slot in alive_slots and member.hp <= 0
+                )
+                total_deaths += new_deaths
+                wins += int(won)
+                deathless_wins += int(won and new_deaths == 0)
+                enemies = searched.get("enemies") or []
+                progress += sum(
+                    1.0 - int(enemy.get("hp") or 0) / max(1, int(enemy.get("max_hp") or 1))
+                    for enemy in enemies
+                )
+                remaining += sum(
+                    member.hp / max(1, member.max_hp) for member in ending
+                )
+                team = [
+                    _clear_between_battle_effects(member, heal=True)
+                    for member in ending
+                ]
+                if not won or total_deaths > max_total_faints or not any(member.alive for member in team):
+                    break
+            complete = int(wins == len(trainers) and total_deaths <= max_total_faints)
+            key = (
+                float(complete), float(wins), -float(total_deaths),
+                float(deathless_wins), progress, remaining,
+            )
+            refinement_cache[indices] = key
+            return key
+
+        if refinement_pool:
+            refined_best = max(
+                refinement_pool,
+                key=lambda indices: (refined_route_key(indices), tuple(-i for i in indices)),
+            )
+            if refined_route_key(refined_best) > refined_route_key(best_route_indices):
+                best_route_indices = refined_best
+        working = _clone_calc_team([roster[index] for index in best_route_indices])
+        reproducibility_payload = {
+            "algorithm": "paired-route-coverage-v1",
+            "trainers": [trainer.trainer_name for trainer in trainers],
+            "roster": [
+                [member.name, member.species, member.level, list(member.known_moves)]
+                for member in roster
+            ],
+            "leveling_policy": leveling_policy,
+            "max_total_faints": max_total_faints,
+            "chosen_indices": list(best_route_indices),
+        }
+        reproducibility_key = hashlib.sha256(
+            json.dumps(reproducibility_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()[:16]
+        route_team_selection = {
+            "policy": "paired-route-coverage-v1",
+            "box_size": len(roster),
+            "candidates_tested": len(route_score_cache),
+            "indices": list(best_route_indices),
+            "chosen": [member.name for member in working],
+            "coverage": coverage_report,
+            "selection_score": list(route_candidate_key(best_route_indices)),
+            "refinement_candidates_tested": len(refinement_cache),
+            "refinement_score": list(refined_route_key(best_route_indices)),
+            "reproducibility_key": reproducibility_key,
+            "note": "One legal six-Pokémon party was selected by deterministic paired coverage across every queued trainer; no PC reselection occurs between fights.",
+        }
     fights: list[dict[str, Any]] = []
     confidence = 1.0
+    total_faints = 0
     stopped_reason: str | None = None
     for index, trainer in enumerate(trainers):
         _GAUNTLET_PROGRESS.update(
@@ -6360,14 +7786,29 @@ def _run_calc_gauntlet(
             pct=round(55 * index / max(1, len(trainers)), 1),
         )
         if index and heal_between:
-            # The route explicitly returns to a Center. Heal every available record before
-            # selecting the next six; this models cycling boxed Pokemon through the party.
-            roster = [_clear_between_battle_effects(member, heal=True) for member in roster]
+            # Heal the carried party as well as the roster. In bag-healing League
+            # routes there is no PC reselection, so `working` is the authoritative
+            # party; healing only `roster` silently carried damage/status forward.
+            roster = [
+                _clear_between_battle_effects(member, heal=True, revive_fainted=allow_revives)
+                for member in roster
+            ]
+            working = [
+                _clear_between_battle_effects(member, heal=True, revive_fainted=allow_revives)
+                for member in working
+            ]
         elif index:
             working = [_clear_between_battle_effects(member, heal=False) for member in working]
 
-        may_reselect = index == 0 or (heal_between and optimize_between_fights)
+        may_reselect = (
+            (index == 0 and route_team_selection is None)
+            or (heal_between and optimize_between_fights)
+        )
         available = roster if may_reselect else working
+        protected_slots = _future_route_protected_slots(
+            available[:6], trainers[index + 1:], calculator,
+            force_enemy_crits=force_enemy_crits,
+        ) if not may_reselect else set()
         if may_reselect:
             result = _run_text_calc_sim_with_team_select(
                 available,
@@ -6396,14 +7837,75 @@ def _run_calc_gauntlet(
             if item_error:
                 result["item_optimization_error"] = item_error
         else:
-            result = _run_text_calc_sim(
+            result = _search_future_preserving_line(
                 working[:6],
                 trainer,
                 calculator,
                 max_turns=max_turns,
                 force_enemy_crits=force_enemy_crits,
+                budget=120,
+                protected_slots=protected_slots,
             )
             selected_party = _clone_calc_team(working[:6])
+        leveling_changes: list[dict[str, Any]] = []
+        alive_slots_before = {member.slot for member in selected_party if member.hp > 0}
+        projected_new_faints = [
+            str(member.get("name") or "unknown")
+            for member in result.get("team") or []
+            if member.get("slot") in alive_slots_before and int(member.get("hp") or 0) <= 0
+        ]
+        unsafe_nuzlocke_win = bool(
+            deathless_required
+            and result.get("result") == "win-line"
+            and projected_new_faints
+        )
+        if (
+            calculator.game_mode == "pokemon-emerald"
+            and (result.get("result") != "win-line" or unsafe_nuzlocke_win)
+            and leveling_policy in {"party-max", "boss-cap"}
+        ):
+            party_high = max((member.level for member in selected_party), default=1)
+            enemy_ace = max((mon.level or 1 for mon in trainer.party), default=1)
+            target_level = party_high if leveling_policy == "party-max" else enemy_ace
+            leveled_available: list[PlannedMember] = []
+            for member in available:
+                if member.level >= target_level:
+                    leveled_available.append(_clone_calc_team([member])[0])
+                    continue
+                raised = _emerald_rare_candy_raise(member, target_level, calculator)
+                leveled_available.append(raised)
+                leveling_changes.append({
+                    "pokemon": member.name, "from": member.level, "to": target_level,
+                    "from_species": member.species, "to_species": raised.species,
+                    "moves_before": list(member.known_moves),
+                    "moves_after": list(raised.known_moves),
+                    "method": "Rare Candy", "reason": "last-resort retry after the original line failed",
+                })
+            if leveling_changes:
+                retry = (
+                    _run_text_calc_sim_with_team_select(
+                        leveled_available, trainer, calculator, max_turns=max_turns,
+                        force_enemy_crits=force_enemy_crits,
+                    )
+                    if may_reselect else
+                    _search_future_preserving_line(
+                        leveled_available[:6], trainer, calculator, max_turns=max_turns,
+                        force_enemy_crits=force_enemy_crits, budget=120,
+                        protected_slots=protected_slots,
+                    )
+                )
+                if retry.get("result") == "win-line" or _line_quality_key(retry) > _line_quality_key(result):
+                    result = retry
+                    available = leveled_available
+                    selected_party = (
+                        _selected_gauntlet_party(result, available)
+                        if may_reselect else _clone_calc_team(available[:6])
+                    )
+                    if may_reselect:
+                        roster = leveled_available
+                    else:
+                        working = leveled_available
+                    result["last_resort_leveling"] = leveling_changes
         result["alternate_answer_lines"] = _alternate_answer_lines(
             available,
             trainer,
@@ -6411,9 +7913,40 @@ def _run_calc_gauntlet(
             result,
             max_turns=max_turns,
             force_enemy_crits=force_enemy_crits,
+            lightweight=True,
         )
+        emerald_guidance = None
+        emerald_diagnosis = None
+        if calculator.game_mode == "pokemon-emerald":
+            emerald_guidance = _emerald_level_guidance(
+                selected_party, trainer, result, None, calculator
+            )
+            emerald_diagnosis = _emerald_failure_diagnosis(
+                selected_party, trainer, result, emerald_guidance, calculator
+            )
+        alive_slots_before = {member.slot for member in selected_party if member.hp > 0}
         starting_team = [_member_payload(member) for member in selected_party]
         working = _team_from_calc_result(result, selected_party)
+        new_fainted = [
+            member.name for member in working
+            if member.slot in alive_slots_before and member.hp <= 0
+        ]
+        total_faints += len(new_fainted)
+        if deathless_required and total_faints > max_total_faints:
+            result["result"] = "nuzlocke-failed"
+            result["nuzlocke_failure"] = {
+                "fainted": new_fainted,
+                "total_faints": total_faints,
+                "max_total_faints": max_total_faints,
+                "note": "The opponent was defeated, but this line exceeds the configured Gauntlet faint budget.",
+            }
+        elif new_fainted:
+            result["accepted_sacrifices"] = {
+                "fainted": new_fainted,
+                "total_faints": total_faints,
+                "max_total_faints": max_total_faints,
+                "note": "The solver preferred zero faints first; this sacrifice is within the explicitly configured fallback budget.",
+            }
         if may_reselect:
             roster = _merge_gauntlet_roster(roster, working)
         confidence *= float(result.get("confidence") or 0.0)
@@ -6428,6 +7961,10 @@ def _run_calc_gauntlet(
             "turns": result.get("turns") or [],
             "line_search": result.get("line_search") or {},
             "alternate_answer_lines": result.get("alternate_answer_lines") or [],
+            "level_guidance": emerald_guidance,
+            "failure_diagnosis": emerald_diagnosis,
+            "nuzlocke_failure": result.get("nuzlocke_failure"),
+            "accepted_sacrifices": result.get("accepted_sacrifices"),
             "is_doubles": trainer.is_double,
             "preparation": {
                 "box_visit": bool(index and heal_between and optimize_between_fights),
@@ -6435,6 +7972,7 @@ def _run_calc_gauntlet(
                 "held_items": {member.name: member.item for member in selected_party if member.item},
                 "item_changes": result.get("item_changes") or [],
                 "item_error": result.get("item_optimization_error"),
+                "leveling": result.get("last_resort_leveling") or [],
             },
         }
         fights.append(fight)
@@ -6457,9 +7995,14 @@ def _run_calc_gauntlet(
         "queued": len(trainers),
         "completed": len(fights),
         "stopped_reason": stopped_reason,
+        "total_faints": total_faints,
+        "max_total_faints": max_total_faints,
+        "ruleset_label": "Hardcore Nuzlocke with bounded sacrifice fallback" if deathless_required and max_total_faints else "Hardcore Nuzlocke" if deathless_required else "Standard rules",
         "final_team": [_member_payload(member) for member in working],
         "final_box": [_member_payload(member) for member in roster],
     }
+    if route_team_selection is not None:
+        payload["route_team_selection"] = route_team_selection
     _GAUNTLET_PROGRESS.update(
         running=True, stage="cartridge-proof",
         phase="Planner complete; starting cartridge proof" if stopped_reason is None else "Planner stopped; no game proof",
@@ -7341,13 +8884,19 @@ def _threat_answers(
         best = None
         for member in team:
             action = _best_player_action(member, enemy, team, calculator)
+            direct_damage = _ranked_known_damage(
+                calculator, member.calc_set(), enemy.calc_set(), member.known_moves
+            )
+            advisory_damage = direct_damage[0] if direct_damage else None
             choices = _calc_enemy_choices(enemy, member, team, calculator)
             choice = choices[0] if choices else None
             incoming = (choice.damage.max_damage / max(1, member.max_hp)) if (choice and choice.damage) else 1.0
             outgoing = 0.0
-            if action and getattr(action, "move_name", ""):
+            if advisory_damage is not None:
                 try:
-                    dmg = calculator.estimate_move(member.calc_set(), enemy.calc_set(), action.move_name)
+                    dmg = calculator.estimate_move(
+                        member.calc_set(), enemy.calc_set(), advisory_damage.move_name
+                    )
                     outgoing = (dmg.max_damage / max(1, enemy.max_hp)) if dmg else 0.0
                 except Exception:
                     outgoing = 0.0
@@ -7358,7 +8907,7 @@ def _threat_answers(
             # Higher is a cleaner answer: survives the hit + hits hard + outspeeds.
             quality = (1.0 - min(1.0, incoming)) * 2.0 + min(1.5, outgoing) + (0.4 if faster else 0.0)
             survives = incoming < 1.0
-            cand = {"mon": member.name, "quality": round(quality, 2), "incoming": round(incoming, 2), "outgoing": round(outgoing, 2), "faster": faster, "survives": survives, "move": getattr(action, "move_name", "")}
+            cand = {"mon": member.name, "quality": round(quality, 2), "incoming": round(incoming, 2), "outgoing": round(outgoing, 2), "faster": faster, "survives": survives, "move": advisory_damage.move_name if advisory_damage else getattr(action, "move_name", "")}
             if best is None or cand["quality"] > best["quality"]:
                 best = cand
         clean = bool(best and best["survives"] and (best["outgoing"] >= 0.34 or best["faster"]))
@@ -7981,6 +9530,7 @@ def _solve_worker(request: SolveRequest) -> None:
             final_line_candidates=request.final_line_candidates,
             on_node_visited=_broadcast_mcts_event,
             cancel_event=cancel_event,
+            game_mode=request.game_mode,
         )
         _register_mcts(mcts)
         try:

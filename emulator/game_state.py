@@ -67,12 +67,13 @@ class WholeGameStateReader:
         else:
             mode = GameMode.MENU_OR_DIALOGUE
         map_group, map_number = self._map_id()
+        x, y = self._position()
         return GameSnapshot(
             mode=mode,
             map_group=map_group,
             map_number=map_number,
-            x=self.instance.read_u16(config.RUN_BUN_PLAYER_X),
-            y=self.instance.read_u16(config.RUN_BUN_PLAYER_Y),
+            x=x,
+            y=y,
             trainer_name=match.battle.trainer_name if match else None,
             trainer_location=(match.battle.location or match.battle.section) if match else None,
             trainer_confidence=("exact" if match.hp_error == 0 else "close") if match else None,
@@ -98,6 +99,22 @@ class WholeGameStateReader:
         if base is None:
             return None, None
         return self.instance.read_u8(base + 4), self.instance.read_u8(base + 5)
+
+    def _position(self) -> tuple[int, int]:
+        # Vanilla Emerald stores its live coordinates at the front of SaveBlock1.
+        # Pointer discovery also handles relocated Run & Bun save blocks.
+        if self._pointers is None:
+            self._map_id()
+        base = self._pointers.save_block_1 if self._pointers else None
+        if base is not None:
+            x = self.instance.read_u16(base)
+            y = self.instance.read_u16(base + 2)
+            if x < 1024 and y < 1024:
+                return x, y
+        return (
+            self.instance.read_u16(config.RUN_BUN_PLAYER_X),
+            self.instance.read_u16(config.RUN_BUN_PLAYER_Y),
+        )
 
     def _screen_looks_overworld(self) -> bool:
         """Recognize the visible map by rejecting battle/menu-sized light panels."""

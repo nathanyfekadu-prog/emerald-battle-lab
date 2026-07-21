@@ -22,10 +22,11 @@ from reportlab.platypus import (
 def build_battle_plan_pdf(result: dict[str, Any], trainer_label: str = "Battle Plan") -> bytes:
     """Render the line-finder result as a real, paginated PDF."""
     out = BytesIO()
+    game_label = str(result.get("game_label") or "Pokémon Battle")
     doc = SimpleDocTemplate(
         out, pagesize=letter, rightMargin=0.55 * inch, leftMargin=0.55 * inch,
         topMargin=0.55 * inch, bottomMargin=0.55 * inch,
-        title=f"Battle Plan - {trainer_label}", author="Pokemon Battle Solver",
+        title=f"{game_label} Battle Plan - {trainer_label}", author="Pokemon Battle Solver",
     )
     styles = getSampleStyleSheet()
     styles.add(ParagraphStyle(name="PlanTitle", parent=styles["Title"], fontName="Helvetica-Bold", fontSize=20, leading=23, spaceAfter=6))
@@ -39,8 +40,8 @@ def build_battle_plan_pdf(result: dict[str, Any], trainer_label: str = "Battle P
     confidence = round(float(result.get("confidence") or 0) * 100)
     realistic = round(float(result.get("realistic_confidence") or result.get("confidence") or 0) * 100)
     story += [
-        Paragraph("Battle Plan", styles["PlanTitle"]),
-        Paragraph(_safe(trainer_label), styles["PlanMeta"]),
+        Paragraph(f"{_safe(game_label)} Battle Plan", styles["PlanTitle"]),
+        Paragraph(f"{_safe(trainer_label)} · {_safe(str(result.get('mechanics') or ''))}", styles["PlanMeta"]),
         Spacer(1, 8),
         Table(
             [[Paragraph(f"<font color='white'><b>{_safe(str(result.get('result') or 'unknown')).upper()}</b></font>", styles["BodyText"]),

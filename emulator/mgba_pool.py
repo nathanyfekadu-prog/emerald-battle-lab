@@ -24,6 +24,8 @@ logger = logging.getLogger(__name__)
 # dominant cost in the old code. Each trial just reloads the savestate to reset RAM to the
 # battle start, which is exactly what booting fresh achieved, only ~100x cheaper.
 _WORKER_INSTANCE: MGBAInstance | None = None
+_WORKER_READER: StateReader | None = None
+_WORKER_READER_STATE: str | None = None
 
 
 def _worker_instance(rom_path: str, save_state_path: str, instance_id: int) -> MGBAInstance:
@@ -35,12 +37,34 @@ def _worker_instance(rom_path: str, save_state_path: str, instance_id: int) -> M
 
 
 def _shutdown_worker_instance() -> None:
-    global _WORKER_INSTANCE
+    global _WORKER_INSTANCE, _WORKER_READER, _WORKER_READER_STATE
     if _WORKER_INSTANCE is not None:
         try:
             _WORKER_INSTANCE.shutdown()
         finally:
             _WORKER_INSTANCE = None
+            _WORKER_READER = None
+            _WORKER_READER_STATE = None
+
+
+def _worker_reader(instance: MGBAInstance, state_path: str) -> StateReader:
+    """Reuse immutable party decoding for trials from the exact same state."""
+    global _WORKER_READER, _WORKER_READER_STATE
+    resolved = str(Path(state_path).expanduser().resolve())
+    if _WORKER_READER is None or _WORKER_READER_STATE != resolved:
+        _WORKER_READER = StateReader(instance)
+        _WORKER_READER_STATE = resolved
+    return _WORKER_READER
+
+
+def _warm_worker_and_read_state(
+    rom_path: str, save_state_path: str, pool_size: int, warmup_id: int
+) -> BattleState:
+    """Boot one reusable worker and return the exact initial battle state."""
+    instance = _worker_instance(rom_path, save_state_path, warmup_id % max(1, pool_size))
+    instance.save_state_path = Path(save_state_path).expanduser().resolve()
+    instance.load_state()
+    return _worker_reader(instance, save_state_path).read()
 
 
 def _empty_state() -> BattleState:
@@ -138,6 +162,7 @@ def _run_trial_worker(
     rom_path: str,
     save_state_path: str,
     pool_size: int,
+    game_mode: str,
     trial: TrialSpec,
 ) -> Outcome:
     instance_id = trial.trial_id % max(1, pool_size)
@@ -148,14 +173,13 @@ def _run_trial_worker(
     try:
         # Reuse this worker's emulator; load_state() below resets it to the battle start.
         instance = _worker_instance(rom_path, save_state_path, os.getpid() % 100)
-        reader = StateReader(instance)
+        instance.save_state_path = Path(trial.start_state_path).expanduser().resolve() if trial.start_state_path else Path(save_state_path).expanduser().resolve()
+        instance.load_state()
+        reader = _worker_reader(instance, str(instance.save_state_path))
         controller = InputController(
             instance, reader, stop_on_player_faint=trial.stop_on_player_faint
         )
-        enumerator = ActionEnumerator()
-
-        instance.save_state_path = Path(trial.start_state_path).expanduser().resolve() if trial.start_state_path else Path(save_state_path).expanduser().resolve()
-        instance.load_state()
+        enumerator = ActionEnumerator(game_mode)
         initial_state = reader.read()
         # A checkpoint edge must be the exact continuation of its saved parent.
         # Worker-dependent desync made a beam path a collection of individually
@@ -207,7 +231,14 @@ def _run_trial_worker(
                     legal_actions = move_actions
             if not legal_actions:
                 break
-            turn_action = legal_actions[(trial.trial_id + turns_attempted) % len(legal_actions)]
+            finisher = enumerator.finishing_action(legal_actions, before)
+            # Most rollout turns should make visible progress. Every fourth
+            # choice still samples the wider action list for setup and pivots.
+            turn_action = (
+                finisher
+                if finisher is not None and (trial.trial_id + turns_attempted) % 4
+                else legal_actions[(trial.trial_id + turns_attempted) % len(legal_actions)]
+            )
             after = controller.execute_turn(list(turn_action))
             actions_taken.extend(turn_action)
             turn_snapshots.append(_turn_snapshot(
@@ -286,10 +317,11 @@ def _run_trial_worker(
 
 
 class MGBAPool:
-    def __init__(self, rom_path: str, save_state_path: str, pool_size: int = 16):
+    def __init__(self, rom_path: str, save_state_path: str, pool_size: int = 16, game_mode: str = "run-and-bun"):
         self.rom_path = rom_path
         self.save_state_path = save_state_path
         self.pool_size = pool_size
+        self.game_mode = game_mode
         cpu_count = os.cpu_count()
         if cpu_count is not None and pool_size > cpu_count:
             logger.warning("pool_size %s is greater than cpu_count %s", pool_size, cpu_count)
@@ -301,6 +333,29 @@ class MGBAPool:
             mp_context=multiprocessing.get_context("spawn"),
         )
 
+    def warmup_and_read_state(self) -> BattleState:
+        """Boot all emulator workers concurrently and reuse one exact state read.
+
+        Previously MCTS booted a throwaway emulator to inspect the state, then
+        booted the real workers serially on their first trials. This overlaps
+        worker startup and removes that disposable emulator without changing a
+        single search or validation sample.
+        """
+        futures = [
+            self._executor.submit(
+                _warm_worker_and_read_state,
+                self.rom_path,
+                self.save_state_path,
+                self.pool_size,
+                index,
+            )
+            for index in range(self.pool_size)
+        ]
+        states = [future.result() for future in concurrent.futures.as_completed(futures)]
+        if not states:
+            raise RuntimeError("No emulator worker returned the initial battle state")
+        return states[0]
+
     def run_trials(self, trials: list[TrialSpec]) -> list[Outcome]:
         futures = [
             self._executor.submit(
@@ -308,6 +363,7 @@ class MGBAPool:
                 self.rom_path,
                 self.save_state_path,
                 self.pool_size,
+                self.game_mode,
                 trial,
             )
             for trial in trials

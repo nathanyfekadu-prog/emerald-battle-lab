@@ -1,0 +1,282 @@
+{
+  "OBJ_EVENT_GFX_AQUA_MEMBER_F": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_AQUA_MEMBER_F.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_AQUA_MEMBER_M": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_AQUA_MEMBER_M.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_BEAUTY": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_BEAUTY.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_BLACK_BELT": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_BLACK_BELT.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_BOY_2": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_BOY_2.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_BRAWLY": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_BRAWLY.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_BUG_CATCHER": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_BUG_CATCHER.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_CAMPER": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_CAMPER.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_CYCLING_TRIATHLETE_F": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_CYCLING_TRIATHLETE_F.png",
+    "width": 32,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_CYCLING_TRIATHLETE_M": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_CYCLING_TRIATHLETE_M.png",
+    "width": 32,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_DRAKE": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_DRAKE.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_EXPERT_F": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_EXPERT_F.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_EXPERT_M": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_EXPERT_M.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_FISHERMAN": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_FISHERMAN.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_FLANNERY": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_FLANNERY.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_GENTLEMAN": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_GENTLEMAN.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_GIRL_3": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_GIRL_3.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_GLACIA": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_GLACIA.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_HEX_MANIAC": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_HEX_MANIAC.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_HIKER": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_HIKER.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_JUAN": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_JUAN.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_LASS": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_LASS.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_MAGMA_MEMBER_M": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_MAGMA_MEMBER_M.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_MANIAC": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_MANIAC.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_MAN_3": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_MAN_3.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_MAN_4": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_MAN_4.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_MAN_5": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_MAN_5.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_MAXIE": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_MAXIE.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_NINJA_BOY": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_NINJA_BOY.png",
+    "width": 16,
+    "height": 16
+  },
+  "OBJ_EVENT_GFX_PHOEBE": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_PHOEBE.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_PICNICKER": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_PICNICKER.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_POKEFAN_F": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_POKEFAN_F.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_POKEFAN_M": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_POKEFAN_M.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_PSYCHIC_M": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_PSYCHIC_M.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_RICH_BOY": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_RICH_BOY.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_ROXANNE": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_ROXANNE.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_RUNNING_TRIATHLETE_F": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_RUNNING_TRIATHLETE_F.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_RUNNING_TRIATHLETE_M": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_RUNNING_TRIATHLETE_M.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_SAILOR": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_SAILOR.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_SCHOOL_KID_M": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_SCHOOL_KID_M.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_SIDNEY": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_SIDNEY.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_STEVEN": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_STEVEN.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_SWIMMER_F": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_SWIMMER_F.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_SWIMMER_M": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_SWIMMER_M.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_TATE": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_TATE.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_TUBER_F": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_TUBER_F.png",
+    "width": 16,
+    "height": 16
+  },
+  "OBJ_EVENT_GFX_TUBER_M": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_TUBER_M.png",
+    "width": 16,
+    "height": 16
+  },
+  "OBJ_EVENT_GFX_TUBER_M_SWIMMING": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_TUBER_M_SWIMMING.png",
+    "width": 16,
+    "height": 16
+  },
+  "OBJ_EVENT_GFX_TWIN": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_TWIN.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_WALLY": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_WALLY.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_WATTSON": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_WATTSON.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_WINONA": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_WINONA.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_WOMAN_2": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_WOMAN_2.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_WOMAN_4": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_WOMAN_4.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_WOMAN_5": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_WOMAN_5.png",
+    "width": 16,
+    "height": 32
+  },
+  "OBJ_EVENT_GFX_YOUNGSTER": {
+    "image": "/static/emerald-trainers/OBJ_EVENT_GFX_YOUNGSTER.png",
+    "width": 16,
+    "height": 32
+  }
+}

@@ -56,6 +56,7 @@ def record_simulator_line(
     *,
     instance_id: int = 91,
     rng_pre_roll_frames: int = 0,
+    output_state_path: str | Path | None = None,
 ) -> dict[str, Any]:
     """Record only the actual game, from command menu through the result dialogue."""
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -110,6 +111,8 @@ def record_simulator_line(
                         stable = stable + 1 if game_reader.read().mode == GameMode.OVERWORLD else 0
                         if stable >= 12:
                             break
+                    if output_state_path is not None and stable >= 12:
+                        instance.save_state(Path(output_state_path).expanduser().resolve())
                 instance.advance_frames(60)
             finally:
                 info = instance.stop_recording()
@@ -132,4 +135,9 @@ def record_simulator_line(
         "final_player_hp": list(final.player_hp) if final else [],
         "final_enemy_hp": list(final.enemy_hp) if final else [],
         "error": error, "video_frames": info["video_frames"],
+        "output_state": (
+            str(Path(output_state_path).expanduser().resolve())
+            if output_state_path is not None and Path(output_state_path).expanduser().resolve().is_file()
+            else None
+        ),
     }

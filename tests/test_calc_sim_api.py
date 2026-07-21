@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import asyncio
 import json
 import threading
 from types import SimpleNamespace
@@ -47,6 +48,16 @@ def test_crit_aware_mode_is_the_default_for_new_lines_and_coach_steps() -> None:
     assert server.config.NUZLOCKE_GRAVEYARD_BOX == 14
 
 
+def test_emerald_gauntlet_defaults_to_hardcore_rules_and_bag_healing() -> None:
+    request = server.GauntletSimRequest(trainer_ids=[469, 470], game_mode="pokemon-emerald")
+    assert request.ruleset == "hardcore-nuzlocke"
+    assert request.items_in_battle is False
+    assert request.allow_revives is False
+    assert request.healing_mode == "bag"
+    assert request.hint_mode is False
+    assert request.leveling_policy == "party-max"
+
+
 def test_corgi_to_chelle_has_reusable_cartridge_playbook() -> None:
     playbook = server._matching_gauntlet_playbook(load_trainer_battles()[47:55])
     assert playbook is not None
@@ -68,6 +79,73 @@ def test_cartridge_gauntlet_never_reuses_an_old_video() -> None:
     assert server._cached_gauntlet_run(request) is None
 
 
+def test_emerald_gauntlet_keeps_imported_party_when_live_save_has_no_roster(monkeypatch) -> None:
+    captured = {}
+    monkeypatch.setattr(server, "_planned_box_from_pc_state", lambda *args, **kwargs: [])
+    monkeypatch.setattr(
+        server,
+        "_run_calc_gauntlet",
+        lambda imported, *args, **kwargs: captured.update(imported=imported) or {
+            "result": "route-complete", "completed": 2, "queued": 2, "fights": [],
+        },
+    )
+    monkeypatch.setattr(server, "_save_gauntlet_run", lambda request, result: {"id": "test"})
+    request = server.GauntletSimRequest(
+        trainer_ids=[0, 1],
+        game_mode="pokemon-emerald",
+        imports="Mudkip @ Oran Berry\nLevel: 5\n- Tackle\n- Growl",
+        rom="emerald.gba",
+        pc_state="tibo.sav",
+        use_live_pc_box=True,
+    )
+
+    result = asyncio.run(server.api_calc_gauntlet(request))
+
+    assert [member.species for member in captured["imported"]] == ["Mudkip"]
+    assert result["roster_source"].startswith("imported team")
+    assert result["emulator_result"] == "planner-only"
+    assert server._GAUNTLET_PROGRESS["pct"] == 100.0
+
+
+def test_local_autofill_only_exposes_existing_files(monkeypatch, tmp_path) -> None:
+    rom = tmp_path / "run-and-bun.gba"
+    rom.write_bytes(b"local test rom")
+    monkeypatch.setenv("POKEBATTLE_ROM", str(rom))
+    assert server._local_testing_config()["rom"] == str(rom.resolve())
+    monkeypatch.setenv("POKEBATTLE_ROM", str(tmp_path / "missing.gba"))
+    assert server._local_testing_config()["rom"] == ""
+
+
+def test_simulator_run_summary_exposes_post_battle_checkpoint() -> None:
+    summary = server._sim_run_summary({
+        "id": "proof-1",
+        "proof_complete": True,
+        "output_state": "/tmp/post-battle.ss0",
+        "request": {"game_mode": "pokemon-emerald"},
+    })
+    assert summary["output_state"] == "/tmp/post-battle.ss0"
+
+
+def test_cartridge_replay_safety_ignores_empty_slots_and_reports_minimum_hp() -> None:
+    result = server._cartridge_replay_safety({"events": [
+        {"event": "battle_start", "trainer": "Corgi", "party_hp": [100, 80, 0]},
+        {"event": "turn", "trainer": "Corgi", "turn": 1, "player_hp": [43, 12, 0]},
+        {"event": "battle_won", "trainer": "Corgi", "party_hp": [43, 12, 0]},
+    ]})
+    assert result == {"deathless": True, "minimum_player_hp": 12, "battles_checked": 1}
+
+
+def test_cartridge_replay_safety_rejects_a_new_faint() -> None:
+    result = server._cartridge_replay_safety({"events": [
+        {"event": "battle_start", "trainer": "Brandi", "party_hp": [100, 80]},
+        {"event": "turn", "trainer": "Brandi", "turn": 3, "player_hp": [31, 0]},
+    ]})
+    assert result["deathless"] is False
+    assert result["failed_trainer"] == "Brandi"
+    assert result["failed_turn"] == 3
+    assert result["failed_slot"] == 1
+
+
 def test_gauntlet_between_battle_rules_preserve_damage_and_consumed_items() -> None:
     member = PlannedMember(
         "Route lead", "Pikachu", 30, 100, 37, ("Thunderbolt",),
@@ -82,6 +160,25 @@ def test_gauntlet_between_battle_rules_preserve_damage_and_consumed_items() -> N
 
     healed = server._clear_between_battle_effects(member, heal=True)
     assert (healed.hp, healed.status, healed.consumed_item) == (100, None, True)
+
+
+def test_emerald_rare_candy_applies_level_evolution_and_prompted_moves() -> None:
+    calculator = DamageCalculator(game_mode="pokemon-emerald")
+    vibrava = PlannedMember(
+        "Ho", "vibrava", 42, 94, 94,
+        ("Dragon Breath", "Screech", "Feint Attack", "Sand Tomb"),
+    )
+    raised = server._emerald_rare_candy_raise(vibrava, 55, calculator)
+    assert raised.species == "flygon"
+    assert raised.level == 55
+    assert raised.hp == raised.max_hp > vibrava.max_hp
+
+    swampert = PlannedMember(
+        "SWAMPERT", "swampert", 43, 152, 152,
+        ("Take Down", "Ice Beam", "Mud-Slap", "Surf"),
+    )
+    raised = server._emerald_rare_candy_raise(swampert, 53, calculator)
+    assert raised.known_moves == ("Protect", "Ice Beam", "Earthquake", "Surf")
 
 
 def test_gauntlet_hands_final_hp_to_the_next_trainer(monkeypatch) -> None:
@@ -104,7 +201,7 @@ def test_gauntlet_hands_final_hp_to_the_next_trainer(monkeypatch) -> None:
         assert roster[0].consumed_item is True
         return result_for(roster, 25)
 
-    monkeypatch.setattr(server, "_run_text_calc_sim", second_fight)
+    monkeypatch.setattr(server, "_search_best_line", second_fight)
     result = server._run_calc_gauntlet(
         team, trainers, DamageCalculator(), max_turns=10,
         force_enemy_crits=True, heal_between=False,
@@ -119,6 +216,54 @@ def test_gauntlet_hands_final_hp_to_the_next_trainer(monkeypatch) -> None:
     assert server._GAUNTLET_PROGRESS["completed"] == 2
     assert server._GAUNTLET_PROGRESS["running"] is True
     assert server._GAUNTLET_PROGRESS["stage"] == "cartridge-proof"
+
+
+def test_bag_healing_restores_the_fixed_carried_party(monkeypatch) -> None:
+    team = [PlannedMember("Lead", "Pikachu", 30, 100, 100, ("Thunderbolt",), slot=1)]
+    trainers = [
+        TrainerBattle("test", "League", "First", False, ()),
+        TrainerBattle("test", "League", "Second", False, ()),
+    ]
+
+    def first(roster, *_args, **_kwargs):
+        payload = server._member_payload(roster[0])
+        payload.update(hp=12, status="brn")
+        return {"result": "win-line", "confidence": 1.0, "team": [payload], "turns": []}
+
+    monkeypatch.setattr(server, "_run_text_calc_sim_with_team_select", first)
+
+    def second(roster, *_args, **_kwargs):
+        assert roster[0].hp == 100
+        assert roster[0].status is None
+        return {
+            "result": "win-line", "confidence": 1.0,
+            "team": [server._member_payload(roster[0])], "turns": [],
+        }
+
+    monkeypatch.setattr(server, "_run_text_calc_sim", second)
+    result = server._run_calc_gauntlet(
+        team, trainers, DamageCalculator(), max_turns=10,
+        force_enemy_crits=False, heal_between=True,
+        optimize_between_fights=False,
+    )
+    assert result["result"] == "route-complete"
+    assert result["fights"][1]["starting_team"][0]["hp"] == 100
+
+
+def test_hardcore_gauntlet_rejects_a_winning_line_with_a_faint(monkeypatch) -> None:
+    team = [PlannedMember("Lead", "Pikachu", 30, 100, 100, ("Thunderbolt",), slot=1)]
+    trainer = TrainerBattle("test", "League", "Boss", False, ())
+    monkeypatch.setattr(server, "_run_text_calc_sim_with_team_select", lambda *_args, **_kwargs: {
+        "result": "win-line", "confidence": 1.0,
+        "team": [{**server._member_payload(team[0]), "hp": 0}], "turns": [],
+    })
+    result = server._run_calc_gauntlet(
+        team, [trainer], DamageCalculator(), max_turns=10,
+        force_enemy_crits=True, heal_between=False, deathless_required=True,
+    )
+    assert result["result"] == "route-stopped"
+    assert result["fights"][0]["result"] == "nuzlocke-failed"
+    assert result["fights"][0]["nuzlocke_failure"]["fainted"] == ["Lead"]
 
 
 def test_healed_gauntlet_reselects_from_full_box_before_each_fight(monkeypatch) -> None:

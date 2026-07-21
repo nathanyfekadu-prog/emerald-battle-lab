@@ -7,6 +7,9 @@ from outcome import TurnAction
 
 
 class ActionEnumerator:
+    def __init__(self, game_mode: str = "run-and-bun"):
+        self.game_mode = game_mode
+
     def legal_actions(self, state: BattleState) -> list[TurnAction]:
         if state.is_doubles:
             return self._doubles_actions(state)
@@ -14,8 +17,9 @@ class ActionEnumerator:
 
     def _singles_actions(self, state: BattleState) -> list[TurnAction]:
         active_slot = next((slot for slot in state.player_active_slots if slot is not None), 0)
-        move_count = self._move_count(state, active_slot)
-        actions: list[TurnAction] = [(Action.move(slot, actor_slot=0),) for slot in range(move_count)]
+        actions: list[TurnAction] = [
+            (Action.move(slot, actor_slot=0),) for slot in self._move_slots(state, active_slot)
+        ]
         for slot, fainted in enumerate(state.player_fainted):
             if slot == active_slot or fainted:
                 continue
@@ -37,7 +41,7 @@ class ActionEnumerator:
         if not live_enemy_positions:
             return []
         per_active: list[list[Action]] = []
-        calculator = default_calculator()
+        calculator = default_calculator(self.game_mode)
         for field_slot, active_slot in enumerate(active_slots):
             active_is_live = (
                 active_slot is not None
@@ -46,7 +50,7 @@ class ActionEnumerator:
             )
             choices: list[Action] = []
             if active_is_live:
-                for move_slot in range(self._move_count(state, active_slot)):
+                for move_slot in self._move_slots(state, active_slot):
                     move_name = self._move_name_for_slot(state, active_slot, move_slot)
                     move_data = (
                         calculator.moves.get(self._normalized(move_name), {})
@@ -112,17 +116,33 @@ class ActionEnumerator:
         return defaults[0], defaults[1]
 
     @staticmethod
-    def _move_count(state: BattleState, party_slot: int) -> int:
+    def _move_slots(state: BattleState, party_slot: int) -> list[int]:
         if party_slot < len(state.player_move_names_by_slot):
-            known = [move for move in state.player_move_names_by_slot[party_slot] if move]
+            names = state.player_move_names_by_slot[party_slot][:4]
+            known = [
+                index for index, move in enumerate(names)
+                if move and not move.casefold().startswith("unknown move")
+            ]
             if known:
-                return min(4, len(known))
+                return known
         if party_slot == 0 and state.player_move_names:
-            return min(4, len([move for move in state.player_move_names if move])) or 4
-        return 4
+            known = [
+                index for index, move in enumerate(state.player_move_names[:4])
+                if move and not move.casefold().startswith("unknown move")
+            ]
+            if known:
+                return known
+        # Older custom states can omit move metadata entirely. Preserve their
+        # historical four-slot behavior, but never invent a slot when a live
+        # state explicitly supplied blank/unknown move entries.
+        has_explicit_names = (
+            party_slot < len(state.player_move_names_by_slot)
+            or (party_slot == 0 and bool(state.player_move_names))
+        )
+        return [] if has_explicit_names else list(range(4))
 
     def prioritize(self, actions: list[TurnAction], state: BattleState) -> list[TurnAction]:
-        calculator = default_calculator()
+        calculator = default_calculator(self.game_mode)
         if calculator is None:
             return actions
         filtered = self._filter_switches(actions, state, calculator)
@@ -151,3 +171,29 @@ class ActionEnumerator:
             if allowed:
                 allowed_switches.append(turn_action)
         return move_actions + allowed_switches
+
+    def finishing_action(self, actions: list[TurnAction], state: BattleState) -> TurnAction | None:
+        """Return the strongest accurate damaging action in the live moveset."""
+        calculator = default_calculator(self.game_mode)
+        scored: list[tuple[float, TurnAction]] = []
+        for turn_action in actions:
+            if not turn_action or not all(action.is_move for action in turn_action):
+                continue
+            score = 0.0
+            for action in turn_action:
+                actor = action.actor_slot or 0
+                party_slot = state.player_active_slots[actor] if actor < len(state.player_active_slots) else 0
+                names = (
+                    state.player_move_names_by_slot[party_slot]
+                    if party_slot is not None and party_slot < len(state.player_move_names_by_slot)
+                    else state.player_move_names
+                )
+                name = names[action.move_slot] if action.move_slot is not None and action.move_slot < len(names) else ""
+                move = calculator.moves.get(self._normalized(name), {})
+                power = float(move.get("basePower") or 0)
+                accuracy = move.get("accuracy", 100)
+                accuracy_factor = float(accuracy) / 100.0 if isinstance(accuracy, (int, float)) else 1.0
+                score += power * accuracy_factor
+            scored.append((score, turn_action))
+        damaging = [entry for entry in scored if entry[0] > 0]
+        return max(damaging, key=lambda entry: entry[0])[1] if damaging else None

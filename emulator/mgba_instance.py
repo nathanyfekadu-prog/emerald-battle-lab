@@ -97,10 +97,14 @@ class MGBAInstance:
 
         self._validate_paths()
         if _libmgba_bridge_available():
+            # The native helper receives the state path at process startup and
+            # loads it while initializing the core. Loading the same GUI-created
+            # state a second time can leave mGBA's timing queue frozen on the next
+            # frame (observed on the Emerald Elite Four checkpoints).
             self._start_libmgba_bridge()
         else:
             self._start_lua_bridge()
-        self.load_state()
+            self.load_state()
         self._set_max_speed()
 
     def load_state(self) -> None:

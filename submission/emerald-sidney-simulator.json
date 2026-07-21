@@ -1,0 +1,1776 @@
+{
+  "created_at": "2026-07-21T23:27:16.276109+00:00",
+  "mode": "standalone-simulator",
+  "trainer": "Elite Four Sidney",
+  "rules": {
+    "items_in_battle": false,
+    "revives": false,
+    "faint_limit": null,
+    "leveling_policy": "boss-cap",
+    "level_cap": 49
+  },
+  "reproducibility": {
+    "deterministic": true,
+    "fingerprint": "1bdb9249f6ec9dba"
+  },
+  "location": "Pokémon  League",
+  "result": "win-line",
+  "confidence": 0.747,
+  "best_confidence": 1.0,
+  "crit_safe": false,
+  "battle_mode": "set",
+  "risk_policy": "Normal mode: enemy high rolls are used; crits are reported as risks when they can break the line.",
+  "team": [
+    {
+      "name": "SWAMPERT",
+      "species": "swampert",
+      "slot": 0,
+      "source": "import",
+      "level": 49,
+      "item": null,
+      "ability": null,
+      "moves": [
+        "Protect",
+        "Ice Beam",
+        "Mud-Slap",
+        "Surf"
+      ],
+      "hp": 63,
+      "max_hp": 172,
+      "status": null,
+      "consumed_item": false
+    },
+    {
+      "name": "Liber",
+      "species": "manectric",
+      "slot": 1,
+      "source": "import",
+      "level": 49,
+      "item": null,
+      "ability": null,
+      "moves": [
+        "Odor Sleuth",
+        "Thunder Wave",
+        "Thunderbolt",
+        "Howl"
+      ],
+      "hp": 58,
+      "max_hp": 142,
+      "status": null,
+      "consumed_item": false
+    },
+    {
+      "name": "Cammy",
+      "species": "banette",
+      "slot": 2,
+      "source": "import",
+      "level": 49,
+      "item": null,
+      "ability": null,
+      "moves": [
+        "Feint Attack",
+        "Night Shade",
+        "Will-O-Wisp",
+        "Shadow Ball"
+      ],
+      "hp": 136,
+      "max_hp": 136,
+      "status": null,
+      "consumed_item": false
+    },
+    {
+      "name": "Endie",
+      "species": "exploud",
+      "slot": 7,
+      "source": "import",
+      "level": 49,
+      "item": null,
+      "ability": null,
+      "moves": [
+        "Uproar",
+        "Stomp",
+        "Screech",
+        "Hyper Beam"
+      ],
+      "hp": 84,
+      "max_hp": 176,
+      "status": null,
+      "consumed_item": false
+    },
+    {
+      "name": "Kissly",
+      "species": "camerupt",
+      "slot": 9,
+      "source": "import",
+      "level": 49,
+      "item": null,
+      "ability": null,
+      "moves": [
+        "Eruption",
+        "Amnesia",
+        "Earthquake",
+        "Rock Slide"
+      ],
+      "hp": 84,
+      "max_hp": 142,
+      "status": null,
+      "consumed_item": false
+    },
+    {
+      "name": "Madden",
+      "species": "golbat",
+      "slot": 11,
+      "source": "import",
+      "level": 49,
+      "item": null,
+      "ability": null,
+      "moves": [
+        "Air Cutter",
+        "Wing Attack",
+        "Poison Fang",
+        "Bite"
+      ],
+      "hp": 1,
+      "max_hp": 147,
+      "status": null,
+      "consumed_item": false
+    }
+  ],
+  "item_recommendations": [],
+  "enemies": [
+    {
+      "name": "Mightyena",
+      "level": 46,
+      "item": null,
+      "ability": null,
+      "moves": [
+        "Crunch",
+        "Double Edge",
+        "Sand-Attack",
+        "Roar"
+      ],
+      "hp": 0,
+      "max_hp": 134
+    },
+    {
+      "name": "Absol",
+      "level": 49,
+      "item": null,
+      "ability": null,
+      "moves": [
+        "Aerial Ace",
+        "Rock Slide",
+        "Slash",
+        "Swords Dance"
+      ],
+      "hp": 0,
+      "max_hp": 137
+    },
+    {
+      "name": "Shiftry",
+      "level": 48,
+      "item": null,
+      "ability": null,
+      "moves": [
+        "Extrasensory",
+        "Double Team",
+        "Swagger",
+        "Torment"
+      ],
+      "hp": 0,
+      "max_hp": 158
+    },
+    {
+      "name": "Crawdaunt",
+      "level": 48,
+      "item": null,
+      "ability": null,
+      "moves": [
+        "Surf",
+        "Strength",
+        "Facade",
+        "Swords Dance"
+      ],
+      "hp": 0,
+      "max_hp": 132
+    },
+    {
+      "name": "Cacturne",
+      "level": 46,
+      "item": null,
+      "ability": null,
+      "moves": [
+        "Faint Attack",
+        "Needle Arm",
+        "Cotton Spore",
+        "Leech Seed"
+      ],
+      "hp": 0,
+      "max_hp": 134
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "enemy": "Mightyena",
+      "answer": "Kissly",
+      "action": "Kissly vs Mightyena: click Eruption.",
+      "calc": "Mightyena uses Double-Edge for 58; Kissly ends 84/142. Mightyena takes 19 recoil and ends 115/134. Kissly uses Eruption for 115; Mightyena ends 0/134. Mightyena faints. Trainer sends Crawdaunt.",
+      "risks": [
+        "AI likely Double-Edge (100%, score 6.4, Emerald AI: highest damage)."
+      ],
+      "consistency": "stateful-calc",
+      "confidence": 1.0,
+      "your_hp": "84/142",
+      "enemy_hp": "0/134",
+      "fork": {
+        "player_move": "Eruption",
+        "player_ko_chance": 1.0,
+        "player_no_ko_means_miss": true,
+        "player_crit_chance": 0.062,
+        "enemy_move": "Double-Edge",
+        "enemy_crit_chance": 0.062,
+        "enemy_crit_changes": false,
+        "enemy_crits_forced": false,
+        "enemy_alternatives": [
+          {
+            "move": "Double-Edge",
+            "score": 6.4,
+            "probability": 1.0
+          }
+        ],
+        "player_damage_outcomes": [
+          {
+            "damage": 115,
+            "remaining_hp": 0,
+            "probability": 1.0,
+            "miss": false
+          }
+        ],
+        "enemy_damage_outcomes": [
+          {
+            "damage": 49,
+            "remaining_hp": 93,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 50,
+            "remaining_hp": 92,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 51,
+            "remaining_hp": 91,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 52,
+            "remaining_hp": 90,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 53,
+            "remaining_hp": 89,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 54,
+            "remaining_hp": 88,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 55,
+            "remaining_hp": 87,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 56,
+            "remaining_hp": 86,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 57,
+            "remaining_hp": 85,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 58,
+            "remaining_hp": 84,
+            "probability": 0.0625,
+            "miss": false
+          }
+        ],
+        "damage_order": [
+          "enemy_damage",
+          "player_damage"
+        ],
+        "uncertainty_order": [
+          "enemy_crit",
+          "enemy_damage",
+          "player_crit",
+          "player_damage"
+        ]
+      },
+      "best_confidence": 1.0,
+      "state_sig": "(4, 0, ((172, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), (142, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), (136, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), (176, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), (142, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), (147, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True)), (((134, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 0), ((137, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 0), ((158, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 0), ((132, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 0), ((134, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 0)))"
+    },
+    {
+      "turn": 2,
+      "enemy": "Crawdaunt",
+      "answer": "Liber",
+      "action": "Switch Kissly -> Liber.",
+      "calc": "Crawdaunt chooses Surf into the outgoing slot; Liber takes 84 and ends 58/142.",
+      "risks": [
+        "AI likely Surf (100%, score 12.4, Emerald AI: fast kill).",
+        "Crit Surf can KO Liber from 142/142."
+      ],
+      "consistency": "switch-cost",
+      "confidence": 0.938,
+      "your_hp": "58/142",
+      "enemy_hp": "132/132",
+      "fork": {
+        "enemy_move": "Surf",
+        "enemy_crit_chance": 0.062,
+        "enemy_crit_changes": true,
+        "enemy_crits_forced": false,
+        "enemy_alternatives": [
+          {
+            "move": "Surf",
+            "score": 12.4,
+            "probability": 1.0
+          }
+        ],
+        "player_damage_outcomes": [],
+        "enemy_damage_outcomes": [
+          {
+            "damage": 71,
+            "remaining_hp": 71,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 72,
+            "remaining_hp": 70,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 73,
+            "remaining_hp": 69,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 74,
+            "remaining_hp": 68,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 75,
+            "remaining_hp": 67,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 76,
+            "remaining_hp": 66,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 77,
+            "remaining_hp": 65,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 78,
+            "remaining_hp": 64,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 79,
+            "remaining_hp": 63,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 80,
+            "remaining_hp": 62,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 81,
+            "remaining_hp": 61,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 82,
+            "remaining_hp": 60,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 83,
+            "remaining_hp": 59,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 84,
+            "remaining_hp": 58,
+            "probability": 0.0625,
+            "miss": false
+          }
+        ],
+        "damage_order": [
+          "enemy_damage"
+        ]
+      },
+      "best_confidence": 1.0,
+      "state_sig": "(4, 3, ((172, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), (142, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), (136, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), (176, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), (84, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), (147, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True)), (((0, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 0), ((137, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 1), ((158, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 1), ((132, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 1), ((134, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 1)))"
+    },
+    {
+      "turn": 3,
+      "enemy": "Crawdaunt",
+      "answer": "Liber",
+      "action": "Liber vs Crawdaunt: click Thunderbolt.",
+      "calc": "Liber uses Thunderbolt for 132; Crawdaunt ends 0/132. Crawdaunt faints. Trainer sends Absol.",
+      "risks": [
+        "AI likely Surf (100%, score 9.4, Emerald AI: slow kill).",
+        "Surf can KO Liber."
+      ],
+      "consistency": "stateful-calc",
+      "confidence": 0.938,
+      "your_hp": "58/142",
+      "enemy_hp": "0/132",
+      "fork": {
+        "player_move": "Thunderbolt",
+        "player_ko_chance": 1.0,
+        "player_no_ko_means_miss": true,
+        "player_crit_chance": 0.062,
+        "enemy_move": "Surf",
+        "enemy_crit_chance": 0.062,
+        "enemy_crit_changes": false,
+        "enemy_crits_forced": false,
+        "enemy_alternatives": [
+          {
+            "move": "Surf",
+            "score": 9.4,
+            "probability": 1.0
+          }
+        ],
+        "player_damage_outcomes": [
+          {
+            "damage": 132,
+            "remaining_hp": 0,
+            "probability": 1.0,
+            "miss": false
+          }
+        ],
+        "enemy_damage_outcomes": [],
+        "damage_order": [
+          "player_damage",
+          "enemy_damage"
+        ],
+        "uncertainty_order": [
+          "player_crit",
+          "player_damage",
+          "enemy_crit",
+          "enemy_damage"
+        ]
+      },
+      "best_confidence": 1.0,
+      "state_sig": "(1, 3, ((172, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), (58, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), (136, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), (176, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), (84, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), (147, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True)), (((0, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 0), ((137, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 1), ((158, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 1), ((132, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), 1), ((134, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 1)))"
+    },
+    {
+      "turn": 4,
+      "enemy": "Absol",
+      "answer": "SWAMPERT",
+      "action": "Switch Liber -> SWAMPERT.",
+      "calc": "Absol chooses Rock Slide into the outgoing slot; SWAMPERT takes 23 and ends 149/172.",
+      "risks": [
+        "AI likely Rock Slide (100%, score 9.4, Emerald AI: slow kill).",
+        "Rock Slide is 90% accurate.",
+        "Rock Slide has a 30% flinch chance if it moves first."
+      ],
+      "consistency": "switch-cost",
+      "confidence": 0.938,
+      "your_hp": "149/172",
+      "enemy_hp": "137/137",
+      "fork": {
+        "enemy_move": "Rock Slide",
+        "enemy_crit_chance": 0.062,
+        "enemy_crit_changes": false,
+        "enemy_crits_forced": false,
+        "enemy_alternatives": [
+          {
+            "move": "Rock Slide",
+            "score": 9.4,
+            "probability": 1.0
+          }
+        ],
+        "player_damage_outcomes": [],
+        "enemy_damage_outcomes": [
+          {
+            "damage": 0,
+            "remaining_hp": 172,
+            "probability": 0.1,
+            "miss": true
+          },
+          {
+            "damage": 19,
+            "remaining_hp": 153,
+            "probability": 0.1125,
+            "miss": false
+          },
+          {
+            "damage": 20,
+            "remaining_hp": 152,
+            "probability": 0.28125,
+            "miss": false
+          },
+          {
+            "damage": 21,
+            "remaining_hp": 151,
+            "probability": 0.225,
+            "miss": false
+          },
+          {
+            "damage": 22,
+            "remaining_hp": 150,
+            "probability": 0.225,
+            "miss": false
+          },
+          {
+            "damage": 23,
+            "remaining_hp": 149,
+            "probability": 0.05625,
+            "miss": false
+          }
+        ],
+        "damage_order": [
+          "enemy_damage"
+        ]
+      },
+      "best_confidence": 1.0,
+      "state_sig": "(1, 1, ((172, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), (58, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), (136, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), (176, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), (84, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), (147, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True)), (((0, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 0), ((137, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 2), ((158, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 2), ((0, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), 1), ((134, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 2)))"
+    },
+    {
+      "turn": 5,
+      "enemy": "Absol",
+      "answer": "SWAMPERT",
+      "action": "SWAMPERT vs Absol: click Surf.",
+      "calc": "Absol uses Slash for 43; SWAMPERT ends 106/172. SWAMPERT uses Surf for 77; Absol ends 60/137.",
+      "risks": [
+        "AI likely Slash (100%, score 6.4, Emerald AI: highest damage)."
+      ],
+      "consistency": "stateful-calc",
+      "confidence": 0.938,
+      "your_hp": "106/172",
+      "enemy_hp": "60/137",
+      "fork": {
+        "player_move": "Surf",
+        "player_ko_chance": 0.0,
+        "player_no_ko_means_miss": false,
+        "player_crit_chance": 0.062,
+        "enemy_move": "Slash",
+        "enemy_crit_chance": 0.125,
+        "enemy_crit_changes": false,
+        "enemy_crits_forced": false,
+        "enemy_alternatives": [
+          {
+            "move": "Slash",
+            "score": 6.4,
+            "probability": 1.0
+          }
+        ],
+        "player_damage_outcomes": [
+          {
+            "damage": 77,
+            "remaining_hp": 60,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 78,
+            "remaining_hp": 59,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 79,
+            "remaining_hp": 58,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 80,
+            "remaining_hp": 57,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 81,
+            "remaining_hp": 56,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 82,
+            "remaining_hp": 55,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 83,
+            "remaining_hp": 54,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 84,
+            "remaining_hp": 53,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 85,
+            "remaining_hp": 52,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 86,
+            "remaining_hp": 51,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 87,
+            "remaining_hp": 50,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 88,
+            "remaining_hp": 49,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 89,
+            "remaining_hp": 48,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 90,
+            "remaining_hp": 47,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 91,
+            "remaining_hp": 46,
+            "probability": 0.0625,
+            "miss": false
+          }
+        ],
+        "enemy_damage_outcomes": [
+          {
+            "damage": 36,
+            "remaining_hp": 113,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 37,
+            "remaining_hp": 112,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 38,
+            "remaining_hp": 111,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 39,
+            "remaining_hp": 110,
+            "probability": 0.1875,
+            "miss": false
+          },
+          {
+            "damage": 40,
+            "remaining_hp": 109,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 41,
+            "remaining_hp": 108,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 42,
+            "remaining_hp": 107,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 43,
+            "remaining_hp": 106,
+            "probability": 0.0625,
+            "miss": false
+          }
+        ],
+        "damage_order": [
+          "enemy_damage",
+          "player_damage"
+        ],
+        "uncertainty_order": [
+          "enemy_crit",
+          "enemy_damage",
+          "player_crit",
+          "player_damage"
+        ]
+      },
+      "best_confidence": 1.0,
+      "state_sig": "(0, 1, ((149, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), (58, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), (136, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), (176, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), (84, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), (147, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True)), (((0, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 0), ((137, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), 2), ((158, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 2), ((0, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), 1), ((134, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 2)))"
+    },
+    {
+      "turn": 6,
+      "enemy": "Absol",
+      "answer": "SWAMPERT",
+      "action": "SWAMPERT vs Absol: click Surf.",
+      "calc": "Absol uses Slash for 43; SWAMPERT ends 63/172. SWAMPERT uses Surf for 60; Absol ends 0/137. Absol faints. Trainer sends Cacturne.",
+      "risks": [
+        "AI likely Slash (100%, score 6.4, Emerald AI: highest damage)."
+      ],
+      "consistency": "stateful-calc",
+      "confidence": 0.938,
+      "your_hp": "63/172",
+      "enemy_hp": "0/137",
+      "fork": {
+        "player_move": "Surf",
+        "player_ko_chance": 1.0,
+        "player_no_ko_means_miss": true,
+        "player_crit_chance": 0.062,
+        "enemy_move": "Slash",
+        "enemy_crit_chance": 0.125,
+        "enemy_crit_changes": false,
+        "enemy_crits_forced": false,
+        "enemy_alternatives": [
+          {
+            "move": "Slash",
+            "score": 6.4,
+            "probability": 1.0
+          }
+        ],
+        "player_damage_outcomes": [
+          {
+            "damage": 60,
+            "remaining_hp": 0,
+            "probability": 1.0,
+            "miss": false
+          }
+        ],
+        "enemy_damage_outcomes": [
+          {
+            "damage": 36,
+            "remaining_hp": 70,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 37,
+            "remaining_hp": 69,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 38,
+            "remaining_hp": 68,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 39,
+            "remaining_hp": 67,
+            "probability": 0.1875,
+            "miss": false
+          },
+          {
+            "damage": 40,
+            "remaining_hp": 66,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 41,
+            "remaining_hp": 65,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 42,
+            "remaining_hp": 64,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 43,
+            "remaining_hp": 63,
+            "probability": 0.0625,
+            "miss": false
+          }
+        ],
+        "damage_order": [
+          "enemy_damage",
+          "player_damage"
+        ],
+        "uncertainty_order": [
+          "enemy_crit",
+          "enemy_damage",
+          "player_crit",
+          "player_damage"
+        ]
+      },
+      "best_confidence": 1.0,
+      "state_sig": "(0, 1, ((106, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), (58, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), (136, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), (176, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), (84, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), (147, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True)), (((0, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 0), ((60, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), 2), ((158, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 2), ((0, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), 1), ((134, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 2)))"
+    },
+    {
+      "turn": 7,
+      "enemy": "Cacturne",
+      "answer": "Madden",
+      "action": "Switch SWAMPERT -> Madden.",
+      "calc": "Cacturne chooses Needle Arm into the outgoing slot; Madden takes 12 and ends 135/147.",
+      "risks": [
+        "AI likely Needle Arm (100%, score 9.4, Emerald AI: slow kill).",
+        "Needle Arm has a 30% flinch chance if it moves first."
+      ],
+      "consistency": "switch-cost",
+      "confidence": 0.938,
+      "your_hp": "135/147",
+      "enemy_hp": "134/134",
+      "fork": {
+        "enemy_move": "Needle Arm",
+        "enemy_crit_chance": 0.062,
+        "enemy_crit_changes": false,
+        "enemy_crits_forced": false,
+        "enemy_alternatives": [
+          {
+            "move": "Needle Arm",
+            "score": 9.4,
+            "probability": 1.0
+          }
+        ],
+        "player_damage_outcomes": [],
+        "enemy_damage_outcomes": [
+          {
+            "damage": 10,
+            "remaining_hp": 137,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 11,
+            "remaining_hp": 136,
+            "probability": 0.5,
+            "miss": false
+          },
+          {
+            "damage": 12,
+            "remaining_hp": 135,
+            "probability": 0.375,
+            "miss": false
+          }
+        ],
+        "damage_order": [
+          "enemy_damage"
+        ]
+      },
+      "best_confidence": 1.0,
+      "state_sig": "(0, 4, ((63, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), (58, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), (136, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), (176, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), (84, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), (147, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True)), (((0, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 0), ((0, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), 2), ((158, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 3), ((0, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), 1), ((134, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 3)))"
+    },
+    {
+      "turn": 8,
+      "enemy": "Cacturne",
+      "answer": "Madden",
+      "action": "Madden vs Cacturne: click Wing Attack.",
+      "calc": "Madden uses Wing Attack for 91; Cacturne ends 43/134. Cacturne uses Leech Seed for 0; Madden ends 135/147. End of turn: Madden drops to 117/147. End of turn: Cacturne recovers to 61/134.",
+      "risks": [
+        "AI likely Leech Seed (100%, score 7.2, Emerald AI: Leech Seed AI)."
+      ],
+      "consistency": "stateful-calc",
+      "confidence": 0.9,
+      "your_hp": "117/147",
+      "enemy_hp": "61/134",
+      "fork": {
+        "player_move": "Wing Attack",
+        "player_ko_chance": 0.0,
+        "player_no_ko_means_miss": false,
+        "player_crit_chance": 0.062,
+        "enemy_move": "Leech Seed",
+        "enemy_crit_chance": 0.062,
+        "enemy_crit_changes": false,
+        "enemy_crits_forced": false,
+        "enemy_alternatives": [
+          {
+            "move": "Leech Seed",
+            "score": 7.2,
+            "probability": 1.0
+          }
+        ],
+        "player_damage_outcomes": [
+          {
+            "damage": 91,
+            "remaining_hp": 43,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 92,
+            "remaining_hp": 42,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 93,
+            "remaining_hp": 41,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 95,
+            "remaining_hp": 39,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 96,
+            "remaining_hp": 38,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 97,
+            "remaining_hp": 37,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 98,
+            "remaining_hp": 36,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 99,
+            "remaining_hp": 35,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 100,
+            "remaining_hp": 34,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 101,
+            "remaining_hp": 33,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 102,
+            "remaining_hp": 32,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 103,
+            "remaining_hp": 31,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 104,
+            "remaining_hp": 30,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 105,
+            "remaining_hp": 29,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 106,
+            "remaining_hp": 28,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 108,
+            "remaining_hp": 26,
+            "probability": 0.0625,
+            "miss": false
+          }
+        ],
+        "enemy_damage_outcomes": [],
+        "damage_order": [
+          "player_damage",
+          "enemy_damage"
+        ],
+        "uncertainty_order": [
+          "player_crit",
+          "player_damage",
+          "enemy_crit",
+          "enemy_damage"
+        ]
+      },
+      "best_confidence": 1.0,
+      "state_sig": "(5, 4, ((63, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), (58, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), (136, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), (176, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), (84, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), (135, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True)), (((0, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 0), ((0, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), 2), ((158, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 3), ((0, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), 1), ((134, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), 3)))"
+    },
+    {
+      "turn": 9,
+      "enemy": "Cacturne",
+      "answer": "Madden",
+      "action": "Madden vs Cacturne: click Wing Attack.",
+      "calc": "Madden uses Wing Attack for 61; Cacturne ends 0/134. End of turn: Madden drops to 99/147. Cacturne faints. Trainer sends Shiftry.",
+      "risks": [
+        "AI likely Needle Arm (100%, score 6.4, Emerald AI: highest damage).",
+        "Needle Arm has a 30% flinch chance if it moves first."
+      ],
+      "consistency": "stateful-calc",
+      "confidence": 0.9,
+      "your_hp": "99/147",
+      "enemy_hp": "0/134",
+      "fork": {
+        "player_move": "Wing Attack",
+        "player_ko_chance": 1.0,
+        "player_no_ko_means_miss": true,
+        "player_crit_chance": 0.062,
+        "enemy_move": "Needle Arm",
+        "enemy_crit_chance": 0.062,
+        "enemy_crit_changes": false,
+        "enemy_crits_forced": false,
+        "enemy_alternatives": [
+          {
+            "move": "Needle Arm",
+            "score": 6.4,
+            "probability": 1.0
+          }
+        ],
+        "player_damage_outcomes": [
+          {
+            "damage": 61,
+            "remaining_hp": 0,
+            "probability": 1.0,
+            "miss": false
+          }
+        ],
+        "enemy_damage_outcomes": [],
+        "damage_order": [
+          "player_damage",
+          "enemy_damage"
+        ],
+        "uncertainty_order": [
+          "player_crit",
+          "player_damage",
+          "enemy_crit",
+          "enemy_damage"
+        ]
+      },
+      "best_confidence": 1.0,
+      "state_sig": "(5, 4, ((63, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), (58, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), (136, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), (176, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), (84, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), (117, None, (), 0, 0, True, 0, False, False, False, False, 0, 0, 0, 1, False, True)), (((0, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 0), ((0, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), 2), ((158, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 3), ((0, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), 1), ((61, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), 3)))"
+    },
+    {
+      "turn": 10,
+      "enemy": "Shiftry",
+      "answer": "Madden",
+      "action": "Madden vs Shiftry: click Wing Attack.",
+      "calc": "Madden uses Wing Attack for 86; Shiftry ends 72/158. Shiftry uses Extrasensory for 80; Madden ends 19/147. End of turn: Madden drops to 1/147. End of turn: Shiftry recovers to 90/158.",
+      "risks": [
+        "AI likely Extrasensory (100%, score 6.4, Emerald AI: highest damage).",
+        "Crit Extrasensory can KO Madden from 99/147.",
+        "Extrasensory has a 10% flinch chance if it moves first."
+      ],
+      "consistency": "stateful-calc",
+      "confidence": 0.844,
+      "your_hp": "1/147",
+      "enemy_hp": "90/158",
+      "fork": {
+        "player_move": "Wing Attack",
+        "player_ko_chance": 0.0,
+        "player_no_ko_means_miss": false,
+        "player_crit_chance": 0.062,
+        "enemy_move": "Extrasensory",
+        "enemy_crit_chance": 0.062,
+        "enemy_crit_changes": true,
+        "enemy_crits_forced": false,
+        "enemy_alternatives": [
+          {
+            "move": "Extrasensory",
+            "score": 6.4,
+            "probability": 1.0
+          }
+        ],
+        "player_damage_outcomes": [
+          {
+            "damage": 86,
+            "remaining_hp": 72,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 87,
+            "remaining_hp": 71,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 88,
+            "remaining_hp": 70,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 89,
+            "remaining_hp": 69,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 90,
+            "remaining_hp": 68,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 91,
+            "remaining_hp": 67,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 92,
+            "remaining_hp": 66,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 93,
+            "remaining_hp": 65,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 94,
+            "remaining_hp": 64,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 95,
+            "remaining_hp": 63,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 96,
+            "remaining_hp": 62,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 97,
+            "remaining_hp": 61,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 98,
+            "remaining_hp": 60,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 99,
+            "remaining_hp": 59,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 100,
+            "remaining_hp": 58,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 102,
+            "remaining_hp": 56,
+            "probability": 0.0625,
+            "miss": false
+          }
+        ],
+        "enemy_damage_outcomes": [
+          {
+            "damage": 68,
+            "remaining_hp": 31,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 69,
+            "remaining_hp": 30,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 70,
+            "remaining_hp": 29,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 71,
+            "remaining_hp": 28,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 72,
+            "remaining_hp": 27,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 73,
+            "remaining_hp": 26,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 74,
+            "remaining_hp": 25,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 75,
+            "remaining_hp": 24,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 76,
+            "remaining_hp": 23,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 77,
+            "remaining_hp": 22,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 78,
+            "remaining_hp": 21,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 79,
+            "remaining_hp": 20,
+            "probability": 0.0625,
+            "miss": false
+          },
+          {
+            "damage": 80,
+            "remaining_hp": 19,
+            "probability": 0.0625,
+            "miss": false
+          }
+        ],
+        "damage_order": [
+          "player_damage",
+          "enemy_damage"
+        ],
+        "uncertainty_order": [
+          "player_crit",
+          "player_damage",
+          "enemy_crit",
+          "enemy_damage"
+        ]
+      },
+      "best_confidence": 1.0,
+      "state_sig": "(5, 2, ((63, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), (58, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), (136, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), (176, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), (84, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), (99, None, (), 0, 0, True, 0, False, False, False, False, 0, 0, 0, 1, False, True)), (((0, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 0), ((0, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), 2), ((158, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 4), ((0, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), 1), ((0, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), 3)))"
+    },
+    {
+      "turn": 11,
+      "enemy": "Shiftry",
+      "answer": "Endie",
+      "action": "Switch Madden -> Endie.",
+      "calc": "Shiftry chooses Extrasensory into the outgoing slot; Endie takes 46 and ends 130/176.",
+      "risks": [
+        "AI likely Extrasensory (100%, score 9.4, Emerald AI: slow kill).",
+        "Extrasensory has a 10% flinch chance if it moves first."
+      ],
+      "consistency": "switch-cost",
+      "confidence": 0.844,
+      "your_hp": "130/176",
+      "enemy_hp": "90/158",
+      "fork": {
+        "enemy_move": "Extrasensory",
+        "enemy_crit_chance": 0.062,
+        "enemy_crit_changes": false,
+        "enemy_crits_forced": false,
+        "enemy_alternatives": [
+          {
+            "move": "Extrasensory",
+            "score": 9.4,
+            "probability": 1.0
+          }
+        ],
+        "player_damage_outcomes": [],
+        "enemy_damage_outcomes": [
+          {
+            "damage": 39,
+            "remaining_hp": 137,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 40,
+            "remaining_hp": 136,
+            "probability": 0.1875,
+            "miss": false
+          },
+          {
+            "damage": 41,
+            "remaining_hp": 135,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 42,
+            "remaining_hp": 134,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 43,
+            "remaining_hp": 133,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 44,
+            "remaining_hp": 132,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 45,
+            "remaining_hp": 131,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 46,
+            "remaining_hp": 130,
+            "probability": 0.0625,
+            "miss": false
+          }
+        ],
+        "damage_order": [
+          "enemy_damage"
+        ]
+      },
+      "best_confidence": 1.0,
+      "state_sig": "(5, 2, ((63, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), (58, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), (136, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), (176, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), (84, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), (1, None, (), 0, 0, True, 0, False, False, False, False, 0, 0, 0, 1, False, True)), (((0, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 0), ((0, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), 2), ((90, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), 4), ((0, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), 1), ((0, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), 3)))"
+    },
+    {
+      "turn": 12,
+      "enemy": "Shiftry",
+      "answer": "Endie",
+      "action": "Endie vs Shiftry: click Hyper Beam.",
+      "calc": "Shiftry uses Extrasensory for 46; Endie ends 84/176. Endie uses Hyper Beam for 90; Shiftry ends 0/158. Shiftry faints.",
+      "risks": [
+        "AI likely Extrasensory (100%, score 8.4, Emerald AI: highest damage).",
+        "Extrasensory has a 10% flinch chance if it moves first."
+      ],
+      "consistency": "stateful-calc",
+      "confidence": 0.747,
+      "your_hp": "84/176",
+      "enemy_hp": "0/158",
+      "fork": {
+        "player_move": "Hyper Beam",
+        "player_ko_chance": 0.9,
+        "player_no_ko_means_miss": true,
+        "player_crit_chance": 0.062,
+        "enemy_move": "Extrasensory",
+        "enemy_crit_chance": 0.062,
+        "enemy_crit_changes": false,
+        "enemy_crits_forced": false,
+        "enemy_alternatives": [
+          {
+            "move": "Extrasensory",
+            "score": 8.4,
+            "probability": 1.0
+          }
+        ],
+        "player_damage_outcomes": [
+          {
+            "damage": 0,
+            "remaining_hp": 90,
+            "probability": 0.1,
+            "miss": true
+          },
+          {
+            "damage": 90,
+            "remaining_hp": 0,
+            "probability": 0.9,
+            "miss": false
+          }
+        ],
+        "enemy_damage_outcomes": [
+          {
+            "damage": 39,
+            "remaining_hp": 91,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 40,
+            "remaining_hp": 90,
+            "probability": 0.1875,
+            "miss": false
+          },
+          {
+            "damage": 41,
+            "remaining_hp": 89,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 42,
+            "remaining_hp": 88,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 43,
+            "remaining_hp": 87,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 44,
+            "remaining_hp": 86,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 45,
+            "remaining_hp": 85,
+            "probability": 0.125,
+            "miss": false
+          },
+          {
+            "damage": 46,
+            "remaining_hp": 84,
+            "probability": 0.0625,
+            "miss": false
+          }
+        ],
+        "damage_order": [
+          "enemy_damage",
+          "player_damage"
+        ],
+        "uncertainty_order": [
+          "enemy_crit",
+          "enemy_damage",
+          "player_crit",
+          "player_damage"
+        ]
+      },
+      "best_confidence": 1.0,
+      "state_sig": "(3, 2, ((63, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), (58, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), (136, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), (130, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), (84, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), (1, None, (), 0, 0, True, 0, False, False, False, False, 0, 0, 0, 1, False, True)), (((0, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 0, False, True), 0), ((0, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), 2), ((90, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), 4), ((0, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), 1), ((0, None, (), 0, 0, False, 0, False, False, False, False, 0, 0, 0, 1, False, True), 3)))"
+    }
+  ],
+  "matchups": [
+    {
+      "player": "SWAMPERT",
+      "enemy": "Mightyena",
+      "best_move": "Surf",
+      "damage": "81-96 (60.4-71.6%)",
+      "enemy_best": "Double-Edge",
+      "enemy_damage": "40-48 (23.3-27.9%)"
+    },
+    {
+      "player": "SWAMPERT",
+      "enemy": "Absol",
+      "best_move": "Surf",
+      "damage": "77-91 (56.2-66.4%)",
+      "enemy_best": "Slash",
+      "enemy_damage": "36-43 (20.9-25.0%)"
+    },
+    {
+      "player": "SWAMPERT",
+      "enemy": "Shiftry",
+      "best_move": "Ice Beam",
+      "damage": "105-124 (66.5-78.5%)",
+      "enemy_best": "Extrasensory",
+      "enemy_damage": "29-35 (16.9-20.3%)"
+    },
+    {
+      "player": "SWAMPERT",
+      "enemy": "Crawdaunt",
+      "best_move": "Surf",
+      "damage": "42-49 (31.8-37.1%)",
+      "enemy_best": "Surf",
+      "enemy_damage": "52-61 (30.2-35.5%)"
+    },
+    {
+      "player": "SWAMPERT",
+      "enemy": "Cacturne",
+      "best_move": "Ice Beam",
+      "damage": "108-128 (80.6-95.5%)",
+      "enemy_best": "Needle Arm",
+      "enemy_damage": "153-180 (89.0-104.7%)"
+    },
+    {
+      "player": "Liber",
+      "enemy": "Mightyena",
+      "best_move": "Thunderbolt",
+      "damage": "89-105 (66.4-78.4%)",
+      "enemy_best": "Double-Edge",
+      "enemy_damage": "62-73 (43.7-51.4%)"
+    },
+    {
+      "player": "Liber",
+      "enemy": "Absol",
+      "best_move": "Thunderbolt",
+      "damage": "84-99 (61.3-72.3%)",
+      "enemy_best": "Rock Slide",
+      "enemy_damage": "59-70 (41.5-49.3%)"
+    },
+    {
+      "player": "Liber",
+      "enemy": "Shiftry",
+      "best_move": "Thunderbolt",
+      "damage": "42-50 (26.6-31.6%)",
+      "enemy_best": "Extrasensory",
+      "enemy_damage": "40-48 (28.2-33.8%)"
+    },
+    {
+      "player": "Liber",
+      "enemy": "Crawdaunt",
+      "best_move": "Thunderbolt",
+      "damage": "183-216 (138.6-163.6%)",
+      "enemy_best": "Surf",
+      "enemy_damage": "71-84 (50.0-59.2%)"
+    },
+    {
+      "player": "Liber",
+      "enemy": "Cacturne",
+      "best_move": "Thunderbolt",
+      "damage": "44-52 (32.8-38.8%)",
+      "enemy_best": "Needle Arm",
+      "enemy_damage": "52-61 (36.6-43.0%)"
+    },
+    {
+      "player": "Cammy",
+      "enemy": "Mightyena",
+      "best_move": "Shadow Ball",
+      "damage": "35-42 (26.1-31.3%)",
+      "enemy_best": "Crunch",
+      "enemy_damage": "79-93 (58.1-68.4%)"
+    },
+    {
+      "player": "Cammy",
+      "enemy": "Absol",
+      "best_move": "Shadow Ball",
+      "damage": "38-45 (27.7-32.8%)",
+      "enemy_best": "Rock Slide",
+      "enemy_damage": "45-54 (33.1-39.7%)"
+    },
+    {
+      "player": "Cammy",
+      "enemy": "Shiftry",
+      "best_move": "Shadow Ball",
+      "damage": "38-45 (24.1-28.5%)",
+      "enemy_best": "Extrasensory",
+      "enemy_damage": "39-46 (28.7-33.8%)"
+    },
+    {
+      "player": "Cammy",
+      "enemy": "Crawdaunt",
+      "best_move": "Shadow Ball",
+      "damage": "29-35 (22.0-26.5%)",
+      "enemy_best": "Surf",
+      "enemy_damage": "68-81 (50.0-59.6%)"
+    },
+    {
+      "player": "Cammy",
+      "enemy": "Cacturne",
+      "best_move": "Shadow Ball",
+      "damage": "40-47 (29.9-35.1%)",
+      "enemy_best": "Needle Arm",
+      "enemy_damage": "49-58 (36.0-42.6%)"
+    },
+    {
+      "player": "Endie",
+      "enemy": "Mightyena",
+      "best_move": "Hyper Beam",
+      "damage": "99-117 (73.9-87.3%)",
+      "enemy_best": "Double-Edge",
+      "enemy_damage": "49-58 (27.8-33.0%)"
+    },
+    {
+      "player": "Endie",
+      "enemy": "Absol",
+      "best_move": "Hyper Beam",
+      "damage": "105-124 (76.6-90.5%)",
+      "enemy_best": "Slash",
+      "enemy_damage": "43-51 (24.4-29.0%)"
+    },
+    {
+      "player": "Endie",
+      "enemy": "Shiftry",
+      "best_move": "Hyper Beam",
+      "damage": "107-126 (67.7-79.7%)",
+      "enemy_best": "Extrasensory",
+      "enemy_damage": "39-46 (22.2-26.1%)"
+    },
+    {
+      "player": "Endie",
+      "enemy": "Crawdaunt",
+      "best_move": "Hyper Beam",
+      "damage": "81-96 (61.4-72.7%)",
+      "enemy_best": "Surf",
+      "enemy_damage": "68-81 (38.6-46.0%)"
+    },
+    {
+      "player": "Endie",
+      "enemy": "Cacturne",
+      "best_move": "Hyper Beam",
+      "damage": "110-130 (82.1-97.0%)",
+      "enemy_best": "Needle Arm",
+      "enemy_damage": "49-58 (27.8-33.0%)"
+    },
+    {
+      "player": "Kissly",
+      "enemy": "Mightyena",
+      "best_move": "Eruption",
+      "damage": "138-163 (103.0-121.6%)",
+      "enemy_best": "Double-Edge",
+      "enemy_damage": "49-58 (34.5-40.8%)"
+    },
+    {
+      "player": "Kissly",
+      "enemy": "Absol",
+      "best_move": "Eruption",
+      "damage": "132-156 (96.4-113.9%)",
+      "enemy_best": "Slash",
+      "enemy_damage": "44-52 (31.0-36.6%)"
+    },
+    {
+      "player": "Kissly",
+      "enemy": "Shiftry",
+      "best_move": "Eruption",
+      "damage": "267-315 (169.0-199.4%)",
+      "enemy_best": "Extrasensory",
+      "enemy_damage": "38-45 (26.8-31.7%)"
+    },
+    {
+      "player": "Kissly",
+      "enemy": "Crawdaunt",
+      "best_move": "Eruption",
+      "damage": "71-84 (53.8-63.6%)",
+      "enemy_best": "Surf",
+      "enemy_damage": "270-318 (190.1-223.9%)"
+    },
+    {
+      "player": "Kissly",
+      "enemy": "Cacturne",
+      "best_move": "Eruption",
+      "damage": "277-327 (206.7-244.0%)",
+      "enemy_best": "Needle Arm",
+      "enemy_damage": "48-57 (33.8-40.1%)"
+    },
+    {
+      "player": "Madden",
+      "enemy": "Mightyena",
+      "best_move": "Wing Attack",
+      "damage": "40-48 (29.9-35.8%)",
+      "enemy_best": "Double-Edge",
+      "enemy_damage": "45-54 (30.6-36.7%)"
+    },
+    {
+      "player": "Madden",
+      "enemy": "Absol",
+      "best_move": "Wing Attack",
+      "damage": "43-51 (31.4-37.2%)",
+      "enemy_best": "Rock Slide",
+      "enemy_damage": "86-102 (58.5-69.4%)"
+    },
+    {
+      "player": "Madden",
+      "enemy": "Shiftry",
+      "best_move": "Wing Attack",
+      "damage": "86-102 (54.4-64.6%)",
+      "enemy_best": "Extrasensory",
+      "enemy_damage": "68-80 (46.3-54.4%)"
+    },
+    {
+      "player": "Madden",
+      "enemy": "Crawdaunt",
+      "best_move": "Wing Attack",
+      "damage": "34-40 (25.8-30.3%)",
+      "enemy_best": "Surf",
+      "enemy_damage": "59-70 (40.1-47.6%)"
+    },
+    {
+      "player": "Madden",
+      "enemy": "Cacturne",
+      "best_move": "Wing Attack",
+      "damage": "91-108 (67.9-80.6%)",
+      "enemy_best": "Needle Arm",
+      "enemy_damage": "10-12 (6.8-8.2%)"
+    }
+  ],
+  "videos": [
+    {
+      "kind": "simulator-text-replay",
+      "label": "Simulator turn replay",
+      "video_url": "/submission/emerald-sidney-simulator.mp4",
+      "video_ready": true,
+      "text_log_included": true
+    }
+  ],
+  "video_ready": true,
+  "evidence_policy": "video-and-text-required"
+}

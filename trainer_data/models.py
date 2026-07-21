@@ -12,6 +12,7 @@ class TrainerPokemon:
     nature: str | None
     moves: tuple[str, ...]
     dex_key: str | None = None
+    exact_stats: dict[str, int] | None = None
 
 
 @dataclass(frozen=True)
@@ -21,3 +22,7 @@ class TrainerBattle:
     trainer_name: str
     is_double: bool
     party: tuple[TrainerPokemon, ...]
+    required: bool = False
+    map_location: str | None = None
+    sublocation: str | None = None
+    source_row: int | None = None

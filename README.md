@@ -2,7 +2,7 @@
 
 This project reads a live Pokemon battle from an mGBA checkpoint, searches possible moves and switches, and plays a chosen line back through the emulator. The emulator is the final judge: a plan only counts as verified after the real game reaches a win.
 
-The current prototype targets **Pokemon Run & Bun**, an Emerald-based ROM hack. It is not a general solver for every Pokemon game, and it does not ship a ROM.
+The current prototype supports **Pokémon Emerald** and an Emerald-based ROM-hack research mode. It does not ship a ROM.
 
 ## What works now
 
@@ -10,7 +10,7 @@ The current prototype targets **Pokemon Run & Bun**, an Emerald-based ROM hack. 
 - Drives several headless mGBA instances for search and replay.
 - Handles moves, switches, forced replacements, singles, doubles, status, healing, PC visits, and multi-trainer routes in the current Run & Bun setup.
 - Replays saved cartridge policies from the original checkpoint and records MP4 proof, event logs, and final save states.
-- Provides a FastAPI web interface with a one-fight simulator, gauntlet mode, damage calculator, line finder, and replay results.
+- Provides a FastAPI web interface with a ROM-free captured-fight simulator, interactive trainer map, Gauntlet mode, contingency planner, and replay results.
 - Includes 150 automated tests covering state reading, damage calculations, planning, doubles support, emulator control, preparation, and output generation.
 
 There is one important limitation: the abstract planner can still disagree with the cartridge, and some verified fights currently fall back to a saved cartridge playbook after the planner misses the winning line. Closing that search-to-replay gap is active work. A recorded win proves that the controller can execute and verify the policy; it does not, by itself, prove that the general search discovered the policy without help.
@@ -71,15 +71,29 @@ In the Simulator tab:
 4. Start the search.
 5. Review the proposed line and the cartridge replay evidence.
 
-### Judge Demo (no ROM required)
+### Pokémon Emerald judge mode (no ROM required)
 
 After starting the web app, open:
 
 ```text
-http://localhost:8000/?view=demo
+http://localhost:8000/?game=emerald&view=emerald
 ```
 
-Judge Demo reads the committed `demo/judge-demo.json` sample. It shows a sanitized eight-fight verification record and battle snapshot without including a ROM, save state, extracted game asset, or game audio. Live emulator search still requires the user's local game and checkpoint.
+The committed `data/emerald_checkpoint_library.json` was decoded from 173 named
+checkpoints in a completed Emerald run. It contains the saved parties, eligible Box
+rosters, exact map links, and trainer metadata needed by the abstract simulator; it
+contains no ROM bytes or save-state binaries. The judge UI exposes only the 158 unique
+trainer encounters represented by those checkpoints.
+
+Bosses and story walls are collected in the **Recommended for judges** rail. The
+Gauntlet setup includes a one-click Elite Four → Champion Wallace route and asks for a
+ruleset before it starts. Its default is Hardcore Nuzlocke: no items in battle, no
+Revives, bag healing between League rooms, Hint mode off, and Rare Candy leveling only
+as a disclosed last-resort retry. Box 13's invalid Mightyena and the Box 14 graveyard
+are excluded from roster selection.
+
+Live cartridge proof remains available to developers who provide their own local ROM,
+but is not required to explore or run the captured fight library.
 
 Submission copy, the timed video script, and the publication checklist live under `submission/`.
 
@@ -104,6 +118,55 @@ python main.py solve \
   --instances 4 \
   --iterations 60 \
   --output both
+```
+
+### Capture and name battle checkpoints
+
+For hackathon submissions, do not include a ROM or save state in the repository. You can
+still prepare a tidy local library of your own battle checkpoints. For fully automatic
+captures, start this launcher once:
+
+```bash
+source .venv/bin/activate
+python tools/launch_emerald_auto_capture.py \
+  --rom "/absolute/path/to/Pokemon Emerald.gba" \
+  --output "/absolute/path/to/Emerald-checkpoints"
+```
+
+It opens mGBA and starts the naming service. In mGBA, open **Tools → Scripting** and load the
+generated `emerald-auto-capture.lua` file from the checkpoint folder. That one-time setup saves
+a state automatically about half a second after every battle initializes, before you choose a
+move; the watcher then renames it after the recognized Emerald trainer. The emulator continues
+normally after each capture.
+
+The lower-level watcher can also be used on its own if you prefer mGBA's manual save-state
+hotkey, pointing it at an otherwise empty folder:
+
+```bash
+source .venv/bin/activate
+python tools/capture_battle_checkpoints.py \
+  --rom "/absolute/path/to/Pokemon Emerald.gba" \
+  --watch "/absolute/path/to/Emerald-checkpoints"
+```
+
+Then, in mGBA, save a state with your usual save-state hotkey **at the battle command menu**
+(once the opposing lead is on screen, before selecting a move). The tool sees the new `.ss0`
+or `.ss1` file, verifies it in a separate headless mGBA process, and renames it to a safe,
+searchable fight filename such as `fight-breeder-corgi.ss0`. Repeated captures become
+`fight-breeder-corgi-2.ss0`, so nothing is overwritten. It also writes a local
+`checkpoint-manifest.jsonl` log beside the states.
+
+If a trainer is not in the project's data, the state is deliberately left unchanged. Capture
+at the command menu rather than the pre-battle dialogue: the trainer's party is only reliable
+enough to identify after the battle has initialized.
+
+To test an existing state once instead of watching continuously:
+
+```bash
+python tools/capture_battle_checkpoints.py \
+  --rom "/absolute/path/to/Pokemon Emerald.gba" \
+  --watch "/absolute/path/to/Emerald-checkpoints" \
+  --once "/absolute/path/to/slot-1.ss0" --copy
 ```
 
 Run the tests:

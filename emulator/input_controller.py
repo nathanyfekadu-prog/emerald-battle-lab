@@ -517,6 +517,12 @@ class InputController:
         return red < 90 and green < 90 and blue < 90
 
     def _move_cursor_2x2(self, slot: int) -> None:
+        # Both vanilla Emerald and Run & Bun remember the last highlighted
+        # move. Normalize to the top-left cell before selecting the requested
+        # slot, otherwise a logged Growl after Mud-Slap can silently select
+        # Mud-Slap again in the cartridge.
+        self._tap("UP")
+        self._tap("LEFT")
         if slot in (1, 3):
             self._tap("RIGHT")
         if slot in (2, 3):
