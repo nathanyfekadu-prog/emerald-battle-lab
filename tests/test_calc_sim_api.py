@@ -89,7 +89,14 @@ def test_emerald_gauntlet_keeps_imported_party_when_live_save_has_no_roster(monk
             "result": "route-complete", "completed": 2, "queued": 2, "fights": [],
         },
     )
-    monkeypatch.setattr(server, "_save_gauntlet_run", lambda request, result: {"id": "test"})
+    def save_with_required_video(_request, result):
+        result.update({
+            "video_ready": True,
+            "videos": [{"video_ready": True, "video_url": "/test/gauntlet.mp4"}],
+        })
+        return {"id": "test"}
+
+    monkeypatch.setattr(server, "_save_gauntlet_run", save_with_required_video)
     request = server.GauntletSimRequest(
         trainer_ids=[0, 1],
         game_mode="pokemon-emerald",

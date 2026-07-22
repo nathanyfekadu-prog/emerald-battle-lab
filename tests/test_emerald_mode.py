@@ -96,6 +96,9 @@ def test_emerald_ui_keeps_repeatable_baselines_and_plain_gauntlet_failures() -> 
     assert 'pct: 0, stage: "setup-error"' in html
     assert "visibleMatches = matches.slice(0, 24)" in html
     assert 'gameMode !== "emerald" && <div className={`sim-line-record' in html
+    assert 'video_ready: Boolean((data.videos || []).some((video) => video.video_ready))' in html
+    assert "Saving required video and full log" in html
+    assert "Every completed route has a planner video and full text log" in html
 
 
 def test_importer_preserves_bold_required_and_double_battle_rows() -> None:

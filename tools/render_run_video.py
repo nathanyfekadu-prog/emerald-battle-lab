@@ -22,6 +22,26 @@ GOLD = (248, 207, 92)
 RED = (255, 132, 119)
 
 
+def _ffmpeg_executable() -> str:
+    """Use system FFmpeg first, then the wheel-bundled binary."""
+    system_ffmpeg = shutil.which("ffmpeg")
+    if system_ffmpeg:
+        return system_ffmpeg
+    try:
+        from imageio_ffmpeg import get_ffmpeg_exe
+
+        bundled_ffmpeg = get_ffmpeg_exe()
+    except (ImportError, OSError) as exc:
+        raise RuntimeError(
+            "FFmpeg is required because every Simulator and Gauntlet result includes an MP4"
+        ) from exc
+    if not bundled_ffmpeg or not Path(bundled_ffmpeg).is_file():
+        raise RuntimeError(
+            "FFmpeg is required because every Simulator and Gauntlet result includes an MP4"
+        )
+    return bundled_ffmpeg
+
+
 def _font(size: int, *, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     candidates = (
         "/System/Library/Fonts/Supplemental/Arial Bold.ttf" if bold else "/System/Library/Fonts/Supplemental/Arial.ttf",
@@ -117,11 +137,15 @@ def _gauntlet_slides(result: dict[str, Any]) -> list[Image.Image]:
 def _simulator_slides(result: dict[str, Any]) -> list[Image.Image]:
     turns = list(result.get("turns") or [])
     team = [str(member.get("name") or member.get("species")) for member in result.get("team") or []]
+    try:
+        confidence = float(result.get("confidence") or 0.0)
+    except (TypeError, ValueError):
+        confidence = 0.0
     slides = [_slide(
         str(result.get("trainer") or "Battle simulation"),
         "Simulator video record",
         [
-            (f"Result: {result.get('result', 'complete')} · confidence {result.get('confidence', 0):.1%}", MINT),
+            (f"Result: {result.get('result', 'complete')} · confidence {confidence:.1%}", MINT),
             ("Party: " + " · ".join(team), WHITE),
             (f"Location: {result.get('location') or 'captured checkpoint'}", MUTED),
         ],
@@ -145,9 +169,7 @@ def _simulator_slides(result: dict[str, Any]) -> list[Image.Image]:
 
 def render_run_video(result: dict[str, Any], output_path: Path, *, kind: str) -> dict[str, Any]:
     """Create a deterministic MP4. Raises if evidence cannot be produced."""
-    ffmpeg = shutil.which("ffmpeg")
-    if not ffmpeg:
-        raise RuntimeError("ffmpeg is required because every simulator and Gauntlet run must include video evidence")
+    ffmpeg = _ffmpeg_executable()
     slides = _gauntlet_slides(result) if kind == "gauntlet" else _simulator_slides(result)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="emerald-run-video-") as raw_tmp:
@@ -160,11 +182,32 @@ def render_run_video(result: dict[str, Any], output_path: Path, *, kind: str) ->
         concat_lines.append(f"file '{frame}'")
         concat = temp_dir / "slides.txt"
         concat.write_text("\n".join(concat_lines) + "\n", encoding="utf-8")
-        subprocess.run([
-            ffmpeg, "-y", "-f", "concat", "-safe", "0", "-i", str(concat),
-            "-vf", "fps=30,format=yuv420p", "-c:v", "libx264", "-preset", "veryfast",
-            "-crf", "23", "-movflags", "+faststart", str(output_path),
-        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        rendered = temp_dir / "rendered.mp4"
+        errors: list[str] = []
+        for codec_args in (
+            ["-c:v", "libx264", "-preset", "veryfast", "-crf", "23"],
+            ["-c:v", "mpeg4", "-q:v", "4"],
+        ):
+            rendered.unlink(missing_ok=True)
+            completed = subprocess.run([
+                ffmpeg, "-y", "-f", "concat", "-safe", "0", "-i", str(concat),
+                "-vf", "fps=30,format=yuv420p", *codec_args,
+                "-movflags", "+faststart", str(rendered),
+            ], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+            if completed.returncode == 0 and rendered.is_file() and rendered.stat().st_size > 0:
+                break
+            errors.append((completed.stderr or "unknown FFmpeg error").strip().splitlines()[-1])
+        else:
+            raise RuntimeError(f"Could not encode required MP4: {'; '.join(errors)}")
+        # Decode the full file before publishing it. A half-written MP4 must never be
+        # returned with video_ready=true.
+        verified = subprocess.run(
+            [ffmpeg, "-v", "error", "-i", str(rendered), "-f", "null", "-"],
+            check=False, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True,
+        )
+        if verified.returncode != 0:
+            raise RuntimeError(f"Required MP4 failed decode verification: {verified.stderr.strip()}")
+        rendered.replace(output_path)
     if not output_path.is_file() or output_path.stat().st_size <= 0:
         raise RuntimeError("video renderer completed without producing an MP4")
     return {
@@ -173,4 +216,6 @@ def render_run_video(result: dict[str, Any], output_path: Path, *, kind: str) ->
         "video_url": "",
         "video_ready": True,
         "text_log_included": True,
+        "size_bytes": output_path.stat().st_size,
+        "duration_seconds": round(len(slides) * 2.4, 1),
     }

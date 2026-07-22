@@ -9,3 +9,5 @@ uvicorn
 websockets
 reportlab
 pypdf
+Pillow
+imageio-ffmpeg

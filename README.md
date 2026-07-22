@@ -177,7 +177,7 @@ Run the automated suite with:
 python -m pytest -q
 ```
 
-The current repository passes 189 tests. They cover damage and critical-hit behavior, doubles targeting, trainer imports, Emerald simulator inputs, Nuzlocke preparation, switch guardrails, state reading, PDF output, the planning API, and emulator-support routines. Passing unit and integration tests does not establish that every local ROM revision or emulator timing path is compatible.
+The current repository passes 193 tests. They cover damage and critical-hit behavior, doubles targeting, trainer imports, Emerald simulator inputs, mandatory video results, Nuzlocke preparation, switch guardrails, state reading, PDF output, the planning API, and emulator-support routines. Passing unit and integration tests does not establish that every local ROM revision or emulator timing path is compatible.
 
 ## How Codex was used
 

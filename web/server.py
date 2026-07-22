@@ -314,8 +314,8 @@ app.mount(
     StaticFiles(directory=_GAUNTLET_RUNS_DIR),
     name="gauntlet-artifacts",
 )
-_CALC_ENGINE_VERSION = "2026-07-21-mandatory-video-v2"
-_GAUNTLET_ENGINE_VERSION = "2026-07-21-route-coverage-video-v8"
+_CALC_ENGINE_VERSION = "2026-07-21-mandatory-video-v3"
+_GAUNTLET_ENGINE_VERSION = "2026-07-21-route-coverage-video-v9"
 _GAUNTLET_PLAYBOOKS_DIR = Path(__file__).resolve().parents[1] / "config" / "gauntlet_playbooks"
 
 
@@ -751,8 +751,10 @@ def _save_gauntlet_run(request: GauntletSimRequest, result: dict[str, Any]) -> d
     video_path = _GAUNTLET_RUNS_DIR / f"{run_id}-planner-replay.mp4"
     video = render_run_video(result, video_path, kind="gauntlet")
     video["video_url"] = f"/gauntlet-artifacts/{video_path.name}"
+    if not video.get("video_ready") or not video_path.is_file() or video_path.stat().st_size <= 0:
+        raise RuntimeError("Gauntlet finished without its required MP4")
     result.setdefault("videos", []).append(video)
-    result["video_ready"] = True
+    result["video_ready"] = any(item.get("video_ready") for item in result["videos"])
     result["evidence_policy"] = "video-and-text-required"
     record = {
         "id": run_id,
@@ -1096,6 +1098,38 @@ def _record_completed_simulator(request: SolveRequest, result: SearchResult, sta
         approved_path.unlink(missing_ok=True)
         diversion_path.unlink(missing_ok=True)
         split_path.unlink(missing_ok=True)
+        # Preserve an honest, playable result even when raw gameplay capture fails.
+        # This is labeled as a search report and never satisfies cartridge proof.
+        fallback_path = _SIM_RUNS_DIR / f"{run_id}-search-report.mp4"
+        fallback_result = {
+            "trainer": trainer,
+            "location": "Local mGBA checkpoint",
+            "result": "gameplay-recording-failed",
+            "confidence": float(result.win_probability or 0.0),
+            "team": [{"name": name, "species": name} for name in team],
+            "turns": [
+                {"turn": index, "action": str(action)}
+                for index, action in enumerate(validated_actions, 1)
+            ],
+        }
+        try:
+            fallback_video = render_run_video(fallback_result, fallback_path, kind="simulator")
+            fallback_video.update({
+                "kind": "search-report",
+                "label": "Search report — gameplay recording unavailable",
+                "video_url": f"/sim-videos/{fallback_path.name}",
+                "gameplay": False,
+                "proof_eligible": False,
+                "capture_error": str(exc),
+            })
+            record["videos"].append(fallback_video)
+            record["video_ready"] = True
+            record["fallback_video"] = True
+        except Exception as fallback_exc:
+            fallback_path.unlink(missing_ok=True)
+            raise RuntimeError(
+                f"Gameplay recording failed ({exc}) and the required result video also failed ({fallback_exc})"
+            ) from fallback_exc
     # When a changed team finally passes, pair it with the most recent rejected
     # team's discovery replay so the app presents the requested A/B evidence.
     if ordinary_line and record.get("videos"):
@@ -1144,11 +1178,12 @@ def _record_completed_simulator(request: SolveRequest, result: SearchResult, sta
     # Persist the final proof gate, not the earlier recording placeholder.
     temp.write_text(json.dumps(record, ensure_ascii=False), encoding="utf-8")
     temp.replace(path)
+    any_video_ready = any(item.get("video_ready") for item in record.get("videos", []))
     _sim_proof_update(
         running=False,
-        phase="Cartridge proof complete" if proof_complete else "Cartridge proof did not pass",
-        pct=100.0 if proof_complete else 99.0,
-        video_ready=bool(approved_video and approved_video.get("video_ready")),
+        phase="Cartridge proof complete" if proof_complete else "Video saved; cartridge proof did not pass",
+        pct=100.0 if any_video_ready else 99.0,
+        video_ready=any_video_ready,
         verified=proof_complete,
     )
     return record
@@ -1220,8 +1255,10 @@ def _save_calc_run(request: CalcSimRequest, result: dict[str, Any]) -> dict[str,
     video_path = _CALC_RUNS_DIR / f"{run_id}-turn-replay.mp4"
     video = render_run_video(result, video_path, kind="simulator")
     video["video_url"] = f"/calc-artifacts/{video_path.name}"
+    if not video.get("video_ready") or not video_path.is_file() or video_path.stat().st_size <= 0:
+        raise RuntimeError("Simulator finished without its required MP4")
     result.setdefault("videos", []).append(video)
-    result["video_ready"] = True
+    result["video_ready"] = any(item.get("video_ready") for item in result["videos"])
     result["evidence_policy"] = "video-and-text-required"
     record = {
         "id": run_id,
@@ -1855,6 +1892,7 @@ async def api_calc_trainers(game_mode: str = "run-and-bun") -> dict[str, Any]:
 # that finish under budget snap forward, so the bar never stalls or runs back.
 _CALC_PROGRESS: dict[str, Any] = {
     "running": False, "done": 0, "total": 0, "phase": "", "stage_start": 0, "stage_alloc": 0,
+    "hold_for_video": False,
 }
 
 _GAUNTLET_PROGRESS: dict[str, Any] = {
@@ -1951,7 +1989,38 @@ def _progress_tick() -> None:
 
 
 def _progress_finish() -> None:
-    _CALC_PROGRESS.update(running=False, done=_CALC_PROGRESS["total"], phase="complete")
+    total = max(1, int(_CALC_PROGRESS.get("total") or 0))
+    if _CALC_PROGRESS.get("hold_for_video"):
+        _CALC_PROGRESS.update(
+            running=True, done=max(0, total - 1), total=total,
+            phase="Rendering required video",
+        )
+        return
+    _CALC_PROGRESS.update(running=False, done=total, total=total, phase="complete")
+
+
+def _progress_video_pending() -> None:
+    total = max(1, int(_CALC_PROGRESS.get("total") or 0))
+    _CALC_PROGRESS.update(
+        running=True, done=max(0, total - 1), total=total,
+        phase="Rendering and checking required video", hold_for_video=True,
+    )
+
+
+def _progress_video_complete() -> None:
+    total = max(1, int(_CALC_PROGRESS.get("total") or 0))
+    _CALC_PROGRESS.update(
+        running=False, done=total, total=total,
+        phase="Video and log saved", hold_for_video=False,
+    )
+
+
+def _progress_video_failed() -> None:
+    total = max(1, int(_CALC_PROGRESS.get("total") or 0))
+    _CALC_PROGRESS.update(
+        running=False, done=max(0, total - 1), total=total,
+        phase="Required video failed", hold_for_video=False,
+    )
 
 
 @app.get("/api/calc/progress")
@@ -2043,6 +2112,7 @@ async def api_calc_sim(request: CalcSimRequest) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail="Import at least one Pokemon set.")
     trainer = _trainer_for_calc_request(request, calculator, battles)
     forced_doubles_leads = _requested_doubles_leads(request, len(imported)) if trainer.is_double else None
+    _CALC_PROGRESS["hold_for_video"] = True
     try:
         result = await asyncio.to_thread(
             _run_text_calc_sim_with_team_select,
@@ -2121,10 +2191,15 @@ async def api_calc_sim(request: CalcSimRequest) -> dict[str, Any]:
                 "Doubles board tree: enemy field slot, move, and target choices are separate replayed branches; "
                 "equivalent two-slot positions rejoin. Use Explore every branch to remove the initial budget."
             )
+        _progress_video_pending()
         result["saved_run"] = _save_calc_run(request, result)
+        _progress_video_complete()
         return result
+    except Exception:
+        _progress_video_failed()
+        raise
     finally:
-        _progress_finish()
+        _CALC_PROGRESS["hold_for_video"] = False
 
 
 @app.post("/api/calc/gauntlet")
@@ -2249,8 +2324,8 @@ async def api_calc_gauntlet(request: GauntletSimRequest) -> dict[str, Any]:
                     fight["result"] = "cartridge-verified-line"
             result.update(proof)
             _GAUNTLET_PROGRESS.update(
-                running=False, stage="verified", phase="Cartridge proof complete",
-                pct=100.0, completed_replays=2, total_replays=2, video_ready=True,
+                running=True, stage="video", phase="Rendering and checking required route video",
+                pct=96.0, completed_replays=2, total_replays=2, video_ready=True,
             )
         else:
             planner_complete = result.get("result") == "route-complete"
@@ -2268,15 +2343,32 @@ async def api_calc_gauntlet(request: GauntletSimRequest) -> dict[str, Any]:
                 "videos": [],
             })
             _GAUNTLET_PROGRESS.update(
-                running=False,
-                stage="planner-complete" if planner_complete else "stopped",
-                phase="Planner route complete" if planner_complete else "Route stopped",
-                pct=100.0, video_ready=False,
+                running=True, stage="video",
+                phase="Rendering and checking required route video",
+                pct=96.0, video_ready=False,
             )
         result["saved_run"] = _save_gauntlet_run(request, result)
+        ready_video = any(item.get("video_ready") for item in result.get("videos", []))
+        if not ready_video:
+            raise RuntimeError("Gauntlet finished without its required video result")
+        _GAUNTLET_PROGRESS.update(
+            running=False,
+            stage="verified" if result.get("proof_complete") else (
+                "planner-complete" if result.get("result") == "route-complete" else "stopped"
+            ),
+            phase="Video and log saved",
+            pct=100.0, video_ready=True,
+        )
         return result
     except Exception:
-        _GAUNTLET_PROGRESS.update(running=False, stage="setup-error", phase="Check the route inputs", pct=0.0)
+        video_stage = _GAUNTLET_PROGRESS.get("stage") == "video"
+        _GAUNTLET_PROGRESS.update(
+            running=False,
+            stage="video-error" if video_stage else "setup-error",
+            phase="Required route video failed" if video_stage else "Check the route inputs",
+            pct=99.0 if video_stage else 0.0,
+            video_ready=False,
+        )
         raise
     finally:
         _progress_finish()
