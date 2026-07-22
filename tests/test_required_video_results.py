@@ -45,6 +45,7 @@ def test_tate_and_liza_simulator_partial_line_still_saves_video(monkeypatch, tmp
     assert record["result"]["video_ready"] is True
     assert video["video_ready"] is True
     assert video["size_bytes"] > 1_000
+    assert video["duration_seconds"] == 9.6
     _assert_playable_mp4(tmp_path / Path(video["video_url"]).name)
 
 
@@ -76,6 +77,7 @@ def test_tate_and_liza_stopped_gauntlet_still_saves_video(monkeypatch, tmp_path)
     assert record["result"]["video_ready"] is True
     assert video["video_ready"] is True
     assert video["size_bytes"] > 1_000
+    assert video["duration_seconds"] == 9.6
     _assert_playable_mp4(tmp_path / Path(video["video_url"]).name)
 
 

@@ -217,5 +217,6 @@ def render_run_video(result: dict[str, Any], output_path: Path, *, kind: str) ->
         "video_ready": True,
         "text_log_included": True,
         "size_bytes": output_path.stat().st_size,
-        "duration_seconds": round(len(slides) * 2.4, 1),
+        # The concat manifest repeats the last frame so its duration is honored.
+        "duration_seconds": round((len(slides) + 1) * 2.4, 1),
     }
