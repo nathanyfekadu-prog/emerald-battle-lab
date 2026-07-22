@@ -1732,7 +1732,7 @@
           trainer_ids: [], back_to_back: false, healing_mode: "bag", route_mode: "next",
           start_trainer_id: null, next_count: 4, end_trainer_id: null,
           ruleset: "hardcore-nuzlocke", items_in_battle: false, allow_revives: false,
-          hint_mode: false, leveling_policy: "party-max", max_total_faints: 3, required_path: false,
+          hint_mode: false, leveling_policy: "boss-cap", max_total_faints: 0, required_path: false,
         }));
         const [gauntletResult, setGauntletResult] = useState(null);
         const [gauntletStatus, setGauntletStatus] = useState("ready");
@@ -1858,11 +1858,13 @@
               ? ((data.trainers || []).find((trainer) => trainer.recommended_test) || data.trainers?.[0])
               : data.trainers?.[0];
             setCalcForm((current) => ({
-              ...current,
-              trainer_id: defaultTrainer?.id || 0,
-              imports: mode === "emerald"
-                ? (defaultTrainer?.checkpoint_roster_import || defaultTrainer?.checkpoint_team_import || current.imports || "")
-                : (data.sample_import || current.imports || ""),
+              ...(current.imports ? current : {
+                ...current,
+                trainer_id: defaultTrainer?.id || 0,
+                imports: mode === "emerald"
+                  ? (defaultTrainer?.checkpoint_roster_import || defaultTrainer?.checkpoint_team_import || "")
+                  : (data.sample_import || ""),
+              }),
             }));
             setGauntletForm((current) => {
               if (current.trainer_ids.length) return current;
@@ -2702,7 +2704,7 @@
                     const trainer = (emerald.trainers || []).find((item) => Number(item.id) === Number(trainerId));
                     const capture = (emerald.checkpoint_library?.entries || []).find((item) => Number(item.trainer_id) === Number(trainerId));
                     const ace = Math.max(1, ...(trainer?.party || []).map((mon) => Number(mon.level || 1)));
-                    const nextCap = (emerald.level_caps || []).find((cap) => Number(cap.ace_level) >= ace)?.ace_level || 100;
+                    const nextCap = (emerald.level_caps || []).find((cap) => Number(cap.ace_level) >= ace)?.ace_level || ace;
                     setCalcForm((current) => ({ ...current, trainer_id: Number(trainerId), custom_mode: false, level_cap: Number(nextCap), imports: capture?.roster_import || capture?.team_import || current.imports }));
                     setCanvasTab("strategy"); setStrategyTab("calc");
                   }} />
@@ -3418,7 +3420,7 @@
         function chooseTrainer(trainerId) {
           const trainer = trainers.find((item) => Number(item.id) === Number(trainerId));
           const ace = Math.max(1, ...(trainer?.party || []).map((mon) => Number(mon.level || 1)));
-          const nextCap = levelCaps.find((cap) => Number(cap.ace_level) >= ace)?.ace_level || form.level_cap || 100;
+          const nextCap = levelCaps.find((cap) => Number(cap.ace_level) >= ace)?.ace_level || ace;
           setForm({
             ...form,
             trainer_id: Number(trainerId),
@@ -3575,6 +3577,7 @@
                       <label>Current level cap
                         <select className="rnb-select-full" value={form.level_cap || 15} onChange={(event) => setForm({ ...form, level_cap: Number(event.target.value) })}>
                           {levelCaps.map((cap) => <option value={cap.ace_level} key={`cap-${cap.badge}`}>Badge {cap.badge}: {cap.trainer_name.replace("Leader ", "")} · cap {cap.ace_level}</option>)}
+                          {!levelCaps.some((cap) => Number(cap.ace_level) === Number(form.level_cap)) && <option value={form.level_cap}>Current boss · cap {form.level_cap}</option>}
                         </select>
                       </label>
                       <div className="rnb-small-note">The solver may analyze an already-overleveled Pokémon, but it will never recommend exceeding this cap.</div>
@@ -5283,6 +5286,16 @@
                     </div>}
                   </div>
                   <VideoPicker videos={result.videos || []} title={`${result.trainer || "Simulator"} replay`} subtitle="Generated with the complementary turn-by-turn text log" />
+                  {result.boss_preparation?.applied && <div className="last-resort-disclosure">
+                    <strong>BOSS-CAP PREPARATION APPLIED</strong>
+                    <span>Level cap {result.boss_preparation.level_cap} · {result.boss_preparation.changes.map((change) => `${change.pokemon}: Lv. ${change.from_level} → ${change.to_level}${change.from_species !== change.to_species ? ` (${change.from_species} → ${change.to_species})` : ""}`).join(" · ")}</span>
+                    <small>{result.boss_preparation.note}</small>
+                  </div>}
+                  {result.critical_stress_test && <details className="sim-replay-details">
+                    <summary>Open the all-enemy-crits stress result · {result.critical_stress_test.fainted.length ? `unsafe (${result.critical_stress_test.fainted.join(", ")} fainted)` : "deathless"}</summary>
+                    <div className="sim-ci">{result.critical_stress_test.meaning}</div>
+                    {(result.critical_stress_test.turns || []).map((turn, index) => <div className="sim-turn-detail" key={`crit-stress-${turn.turn || index}`}><strong>Turn {turn.turn || index + 1}: {turn.action || turn.answer || "Continue"}</strong><span>{turn.calc || ""}</span></div>)}
+                  </details>}
                   <PreparationDiagnosis diagnosis={result.failure_diagnosis} />
                   {(result.strategy_report || []).some((strategy) => strategy.used) && (
                     <div className="rnb-turn-row">
@@ -5496,7 +5509,7 @@
             {gameMode === "emerald" && <button className="elite-four-preset" onClick={useEliteFourRoute}><span>RECOMMENDED JUDGE TEST</span><strong>Load the Elite Four → Wallace Gauntlet</strong><small>Five fights · Hardcore Nuzlocke · bag healing between rooms · no Revives</small></button>}
             <div className="ruleset-grid" aria-label="Battle rules">
               <label>Ruleset<select value={form.ruleset || "hardcore-nuzlocke"} onChange={(event) => applyRuleset(event.target.value)}><option value="hardcore-nuzlocke">Hardcore Nuzlocke</option><option value="nuzlocke">Nuzlocke</option><option value="standard">Standard Emerald</option><option value="custom">Custom</option></select></label>
-              <label>Last-resort leveling<select value={form.leveling_policy || "party-max"} onChange={(event) => setForm({ ...form, leveling_policy:event.target.value })}><option value="none">Never level</option><option value="party-max">Rare Candy to current party max</option><option value="boss-cap">Rare Candy up to boss ace</option></select></label>
+              <label>Last-resort leveling<select value={form.leveling_policy || "boss-cap"} onChange={(event) => setForm({ ...form, leveling_policy:event.target.value })}><option value="none">Never level</option><option value="party-max">Rare Candy to current party max</option><option value="boss-cap">Rare Candy up to boss ace (recommended)</option></select></label>
               <label>Sacrifice fallback<select value={Number(form.max_total_faints ?? 3)} onChange={(event) => setForm({ ...form, max_total_faints:Number(event.target.value) })}><option value="0">Zero faints only</option><option value="1">Prefer zero · allow 1</option><option value="2">Prefer zero · allow 2</option><option value="3">Prefer zero · allow up to 3</option></select></label>
               <button className={form.items_in_battle ? "active" : ""} onClick={() => setForm({ ...form, ruleset:"custom", items_in_battle:!form.items_in_battle })}>Items in battle: {form.items_in_battle ? "YES" : "NO"}</button>
               <button className={form.allow_revives ? "active" : ""} onClick={() => setForm({ ...form, ruleset:"custom", allow_revives:!form.allow_revives })}>Revives: {form.allow_revives ? "YES" : "NO"}</button>
@@ -5713,6 +5726,7 @@
               {fight.accepted_sacrifices && <div className="last-resort-disclosure"><strong>BOUNDED SACRIFICE FALLBACK</strong><span>{(fight.accepted_sacrifices.fainted || []).join(", ")} · {fight.accepted_sacrifices.total_faints}/{fight.accepted_sacrifices.max_total_faints} route faint budget used</span><small>Zero-faint lines were ranked first. Fainted Pokémon remain unavailable for every later fight.</small></div>}
               {fight.preparation?.box_visit && <div className="sim-ci">Pokémon Center prep · withdrew {(fight.preparation.chosen || []).join(" · ")}{Object.keys(fight.preparation.held_items || {}).length ? ` · items: ${Object.entries(fight.preparation.held_items).map(([name,item]) => `${name}—${item}`).join(", ")}` : ""}</div>}
               {(fight.preparation?.leveling || []).length > 0 && <div className="last-resort-disclosure"><strong>LAST-RESORT RARE CANDY USE</strong><span>{fight.preparation.leveling.map((change) => `${change.pokemon}: Lv. ${change.from} → ${change.to}`).join(" · ")}</span><small>The original roster failed first. This change is included in the saved run and video disclosure.</small></div>}
+              {fight.critical_stress_test && <details className="sim-replay-details"><summary>All-enemy-crits stress result · unsafe ({(fight.critical_stress_test.fainted || []).join(", ")} fainted)</summary><div className="sim-ci">{fight.critical_stress_test.meaning}</div>{(fight.critical_stress_test.turns || []).map((turn, index) => <div className="sim-turn-detail" key={`${fight.position}-crit-stress-${turn.turn || index}`}><strong>Turn {turn.turn || index + 1}: {turn.action || turn.answer || "Continue"}</strong><span>{turn.calc || ""}</span></div>)}</details>}
               <details className="sim-replay-details"><summary>Open full turn-by-turn line</summary>{(fight.turns || []).map((turn, index) => <div className="sim-turn-detail" key={`${fight.position}-turn-${turn.turn || index}`}><strong>Turn {turn.turn || index + 1}: {turn.action || turn.plan || turn.answer || "Continue line"}</strong><span>{turn.calc || turn.outcome || ""}</span></div>)}</details>
               {(fight.alternate_answer_lines || []).map((alternate, alternateIndex) => <details className="sim-replay-details" key={`${fight.position}-backup-${alternateIndex}`}><summary>Backup {alternateIndex + 1} · no {alternate.forbidden_answer} · {alternate.status === "winning-alternate" ? "DEATHLESS WIN" : alternate.status === "unsafe-alternate" ? "UNSAFE · DEATH OCCURRED" : "NO CLEAR"}</summary><div className="sim-ci">Different team: {(alternate.team || []).join(" · ") || "none"} · confidence {pct(alternate.confidence)}</div>{(alternate.turns || []).map((turn, index) => <div className="sim-turn-detail" key={`${fight.position}-backup-${alternateIndex}-turn-${turn.turn || index}`}><strong>Turn {turn.turn || index + 1}: {turn.action || turn.answer || "Continue line"}</strong><span>{turn.calc || ""}</span></div>)}</details>)}
             </article>)}
