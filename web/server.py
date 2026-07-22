@@ -276,7 +276,7 @@ class GauntletSimRequest(BaseModel):
     allow_revives: bool = False
     healing_mode: str = "bag"
     hint_mode: bool = False
-    leveling_policy: str = "party-max"
+    leveling_policy: str = "boss-cap"
     # Always optimize for zero faints first. This is only the maximum number of
     # tactical sacrifices the user is willing to accept if no zero-faint route exists.
     max_total_faints: int = Field(default=0, ge=0, le=6)
@@ -2108,6 +2108,8 @@ async def api_calc_sim(request: CalcSimRequest) -> dict[str, Any]:
     ), game_mode=mode)
     battles = load_trainer_battles_for_mode(mode)
     imported = _parse_imported_sets(request.imports, calculator)
+    if mode == "pokemon-emerald":
+        imported = _dedupe_emerald_roster_snapshots(imported)
     if not imported:
         raise HTTPException(status_code=400, detail="Import at least one Pokemon set.")
     trainer = _trainer_for_calc_request(request, calculator, battles)
@@ -2123,6 +2125,19 @@ async def api_calc_sim(request: CalcSimRequest) -> dict[str, Any]:
             force_enemy_crits=request.crit_safe,
             forced_doubles_leads=forced_doubles_leads,
         )
+        analysis_roster = imported
+        if mode == "pokemon-emerald" and not request.hint_mode:
+            result, analysis_roster = await asyncio.to_thread(
+                _emerald_boss_cap_retry,
+                imported,
+                trainer,
+                calculator,
+                result,
+                max_turns=max(1, min(60, request.max_turns)),
+                force_enemy_crits=request.crit_safe,
+                forced_doubles_leads=forced_doubles_leads,
+                explicit_level_cap=request.level_cap,
+            )
         active_conditions = []
         if request.weather:
             active_conditions.append(f"{request.weather} weather")
@@ -2139,7 +2154,7 @@ async def api_calc_sim(request: CalcSimRequest) -> dict[str, Any]:
         result["mechanics"] = "Generation III" if mode == "pokemon-emerald" else "Run & Bun ruleset"
         result["alternate_answer_lines"] = await asyncio.to_thread(
             _alternate_answer_lines,
-            imported,
+            analysis_roster,
             trainer,
             calculator,
             result,
@@ -2154,13 +2169,13 @@ async def api_calc_sim(request: CalcSimRequest) -> dict[str, Any]:
                 "hint_mode": bool(request.hint_mode),
             }
             result["level_guidance"] = _emerald_level_guidance(
-                imported, trainer, result, request.level_cap, calculator
+                analysis_roster, trainer, result, request.level_cap, calculator
             )
             result["failure_diagnosis"] = _emerald_failure_diagnosis(
-                imported, trainer, result, result["level_guidance"], calculator
+                analysis_roster, trainer, result, result["level_guidance"], calculator
             )
             result["progressive_hints"] = _emerald_progressive_hints(
-                imported, trainer, result, result["level_guidance"], calculator
+                analysis_roster, trainer, result, result["level_guidance"], calculator
             )
             result["hint_mode"] = bool(request.hint_mode)
         if trainer.is_double and not result.get("contingency_flowchart"):
@@ -2168,9 +2183,9 @@ async def api_calc_sim(request: CalcSimRequest) -> dict[str, Any]:
                 _normalize(str(member.get("name") or member.get("species") or ""))
                 for member in result.get("team") or []
             }
-            chart_team = [member for member in imported if _normalize(member.name) in chosen_names][:6]
+            chart_team = [member for member in analysis_roster if _normalize(member.name) in chosen_names][:6]
             if len(chart_team) < 2:
-                chart_team = imported[:6]
+                chart_team = analysis_roster[:6]
             searched_leads = (result.get("line_search") or {}).get("leads")
             chart_leads = (
                 (int(searched_leads[0]), int(searched_leads[1]))
@@ -2240,6 +2255,8 @@ async def api_calc_gauntlet(request: GauntletSimRequest) -> dict[str, Any]:
                 roster_source = f"imported team (the selected save could not be read: {exc})"
             else:
                 raise HTTPException(status_code=400, detail=f"Could not read a party from the selected save: {exc}") from exc
+    if mode == "pokemon-emerald":
+        imported = _dedupe_emerald_roster_snapshots(imported)
     if not imported:
         raise HTTPException(
             status_code=400,
@@ -3540,6 +3557,10 @@ def _trainer_for_calc_request(
                 trainer_name=trainer.trainer_name,
                 is_double=True,
                 party=tuple(trainer.party[i] for i in order),
+                required=trainer.required,
+                map_location=trainer.map_location,
+                sublocation=trainer.sublocation,
+                source_row=trainer.source_row,
             )
     return trainer
 
@@ -7332,6 +7353,10 @@ def _clear_between_battle_effects(
 
 
 _EMERALD_LEVEL_EVOLUTIONS: dict[str, tuple[int, str]] = {
+    "marshtomp": (36, "swampert"),
+    "poochyena": (18, "mightyena"),
+    "zigzagoon": (20, "linoone"),
+    "zubat": (22, "golbat"),
     "whismur": (20, "loudred"),
     "loudred": (40, "exploud"),
     "slugma": (38, "magcargo"),
@@ -7355,6 +7380,12 @@ _EMERALD_RARE_CANDY_FAMILY: dict[str, str] = {
 # the captured Pokémon would learn while consuming Rare Candies; TMs, tutors, and
 # Move Reminder access are deliberately not invented.
 _EMERALD_RARE_CANDY_MOVESETS: dict[str, tuple[tuple[int, tuple[str, ...]], ...]] = {
+    # Surf is a required story HM before Mossdeep. The other moves are retained or
+    # learned naturally while raising the captured level-17 Marshtomp to the cap;
+    # no optional TM is silently invented for the Tate & Liza retry.
+    "marshtomp": ((39, ("Take Down", "Mud-Slap", "Muddy Water", "Surf")),),
+    "poochyena": ((37, ("Bite", "Howl", "Swagger", "Take Down")),),
+    "zigzagoon": ((41, ("Strength", "Slash", "Rock Smash", "Headbutt")),),
     "swampert": (
         (46, ("Protect", "Ice Beam", "Mud-Slap", "Surf")),
         (52, ("Protect", "Ice Beam", "Earthquake", "Surf")),
@@ -7445,6 +7476,155 @@ def _emerald_rare_candy_raise(
         hp=0 if was_fainted else max_hp,
         moves=tuple(moves),
     )
+
+
+def _dedupe_emerald_roster_snapshots(imported: list[PlannedMember]) -> list[PlannedMember]:
+    """Remove repeated snapshots of the same nicknamed Pokémon from demo imports.
+
+    The generated Emerald checkpoint library can contain an older and a newer
+    snapshot of a named party member (for example two entries named ``Fables``).
+    Those are not two legal box Pokémon. Keep the highest-level snapshot while
+    leaving genuinely distinct, unnamed same-species encounters alone.
+    """
+    result: list[PlannedMember] = []
+    position_by_identity: dict[tuple[str, str], int] = {}
+    for member in imported:
+        # An all-species display name does not establish identity: two separately
+        # caught Zigzagoon may both be shown as ZIGZAGOON. Nicknames do.
+        if _normalize(member.name) == _normalize(member.species):
+            result.append(member)
+            continue
+        identity = (_normalize(member.name), _normalize(member.species))
+        previous = position_by_identity.get(identity)
+        if previous is None:
+            position_by_identity[identity] = len(result)
+            result.append(member)
+        elif member.level > result[previous].level:
+            result[previous] = member
+    return result
+
+
+def _emerald_boss_cap_retry(
+    imported: list[PlannedMember],
+    trainer: TrainerBattle,
+    calculator: DamageCalculator,
+    original: dict[str, Any],
+    *,
+    max_turns: int,
+    force_enemy_crits: bool,
+    forced_doubles_leads: tuple[int, int] | None = None,
+    explicit_level_cap: int | None = None,
+) -> tuple[dict[str, Any], list[PlannedMember]]:
+    """Retry a failed Emerald boss line after legal level-cap preparation."""
+    trainer_key = _normalize(trainer.trainer_name)
+    is_boss = any(
+        trainer_key.startswith(prefix)
+        for prefix in ("leader", "elitefour", "champion")
+    )
+    if not (
+        trainer.required
+        and is_boss
+        and (
+            original.get("result") != "win-line"
+            or any(int(member.get("hp") or 0) <= 0 for member in original.get("team") or [])
+        )
+    ):
+        return original, imported
+
+    ace = max((mon.level or 1 for mon in trainer.party), default=1)
+    target = min(ace, explicit_level_cap) if explicit_level_cap is not None else ace
+    prepared = [_emerald_rare_candy_raise(member, target, calculator) for member in imported]
+    changes = [
+        {
+            "pokemon": before.name,
+            "from_level": before.level,
+            "to_level": after.level,
+            "from_species": before.species,
+            "to_species": after.species,
+            "moves_before": list(before.known_moves),
+            "moves_after": list(after.known_moves),
+            "method": "Rare Candy / normal level-up to the current Gym Leader cap",
+        }
+        for before, after in zip(imported, prepared)
+        if (
+            before.level != after.level
+            or _normalize(before.species) != _normalize(after.species)
+            or tuple(before.known_moves) != tuple(after.known_moves)
+        )
+    ]
+    if not changes:
+        return original, imported
+
+    retry = _run_text_calc_sim_with_team_select(
+        prepared,
+        trainer,
+        calculator,
+        max_turns=max_turns,
+        force_enemy_crits=force_enemy_crits,
+        forced_doubles_leads=forced_doubles_leads,
+    )
+    # ``crit_safe`` is an intentionally brutal stress pass: every enemy damaging
+    # move is treated as a critical hit. If that artificial all-crits timeline can
+    # clear only by sacrificing a Pokémon, do not present the sacrifice as the main
+    # Nuzlocke plan. Keep it as an explicit stress result and return the independently
+    # searched, deathless normal-RNG line when one exists.
+    critical_stress: dict[str, Any] | None = None
+    if (
+        force_enemy_crits
+        and retry.get("result") == "win-line"
+        and any(int(member.get("hp") or 0) <= 0 for member in retry.get("team") or [])
+    ):
+        normal_retry = _run_text_calc_sim_with_team_select(
+            prepared,
+            trainer,
+            calculator,
+            max_turns=max_turns,
+            force_enemy_crits=False,
+            forced_doubles_leads=forced_doubles_leads,
+        )
+        normal_deathless = (
+            normal_retry.get("result") == "win-line"
+            and all(int(member.get("hp") or 0) > 0 for member in normal_retry.get("team") or [])
+        )
+        if normal_deathless:
+            critical_stress = {
+                "result": retry.get("result"),
+                "confidence": retry.get("confidence", 0.0),
+                "fainted": [
+                    str(member.get("name") or member.get("species") or "unknown")
+                    for member in retry.get("team") or []
+                    if int(member.get("hp") or 0) <= 0
+                ],
+                "team": retry.get("team") or [],
+                "turns": retry.get("turns") or [],
+                "meaning": (
+                    "This is the deliberately extreme timeline where every enemy hit crits. "
+                    "It is kept as a contingency warning, not mislabeled as the recommended Nuzlocke line."
+                ),
+            }
+            retry = normal_retry
+            retry["risk_policy"] = (
+                "The main line is a deathless no-forced-crit plan. The separate all-enemy-crits stress "
+                "timeline still clears but is not deathless, so its pivot warning is shown below."
+            )
+    if _line_quality_key(retry) <= _line_quality_key(original):
+        return original, imported
+    retry["boss_preparation"] = {
+        "applied": True,
+        "level_cap": target,
+        "changes": changes,
+        "note": (
+            "The imported roster could not produce a safe complete line as-is. "
+            "The planner retried after legal leveling and automatic evolutions, never above the boss's ace."
+        ),
+        "original_result": original.get("result"),
+        "original_faints": sum(
+            1 for member in original.get("team") or [] if int(member.get("hp") or 0) <= 0
+        ),
+    }
+    if critical_stress is not None:
+        retry["critical_stress_test"] = critical_stress
+    return retry, prepared
 
 
 def _team_from_calc_result(result: dict[str, Any], source: list[PlannedMember]) -> list[PlannedMember]:
@@ -7998,6 +8178,59 @@ def _run_calc_gauntlet(
                     else:
                         working = leveled_available
                     result["last_resort_leveling"] = leveling_changes
+        # As in the one-fight Simulator, never make an all-hits-critical sacrifice
+        # the recommended Hardcore Nuzlocke route when a separately searched
+        # deathless normal-RNG line exists. Preserve the stress clear as evidence.
+        stress_fainted = [
+            str(member.get("name") or member.get("species") or "unknown")
+            for member in result.get("team") or []
+            if int(member.get("hp") or 0) <= 0
+        ]
+        if (
+            calculator.game_mode == "pokemon-emerald"
+            and force_enemy_crits
+            and deathless_required
+            and result.get("result") == "win-line"
+            and stress_fainted
+        ):
+            normal_retry = (
+                _run_text_calc_sim_with_team_select(
+                    available, trainer, calculator, max_turns=max_turns,
+                    force_enemy_crits=False,
+                )
+                if may_reselect else
+                _search_future_preserving_line(
+                    available[:6], trainer, calculator, max_turns=max_turns,
+                    force_enemy_crits=False, budget=120,
+                    protected_slots=protected_slots,
+                )
+            )
+            if (
+                normal_retry.get("result") == "win-line"
+                and all(int(member.get("hp") or 0) > 0 for member in normal_retry.get("team") or [])
+            ):
+                stress_result = result
+                normal_retry["critical_stress_test"] = {
+                    "result": stress_result.get("result"),
+                    "confidence": stress_result.get("confidence", 0.0),
+                    "fainted": stress_fainted,
+                    "team": stress_result.get("team") or [],
+                    "turns": stress_result.get("turns") or [],
+                    "meaning": (
+                        "Every enemy hit was forced to crit in this stress timeline. "
+                        "It is retained as a warning and is not the recommended zero-faint route."
+                    ),
+                }
+                if stress_result.get("last_resort_leveling"):
+                    normal_retry["last_resort_leveling"] = stress_result["last_resort_leveling"]
+                normal_retry["risk_policy"] = (
+                    "Deathless main route plus a separately disclosed all-enemy-crits stress result."
+                )
+                result = normal_retry
+                selected_party = (
+                    _selected_gauntlet_party(result, available)
+                    if may_reselect else _clone_calc_team(available[:6])
+                )
         result["alternate_answer_lines"] = _alternate_answer_lines(
             available,
             trainer,
@@ -8057,6 +8290,7 @@ def _run_calc_gauntlet(
             "failure_diagnosis": emerald_diagnosis,
             "nuzlocke_failure": result.get("nuzlocke_failure"),
             "accepted_sacrifices": result.get("accepted_sacrifices"),
+            "critical_stress_test": result.get("critical_stress_test"),
             "is_doubles": trainer.is_double,
             "preparation": {
                 "box_visit": bool(index and heal_between and optimize_between_fights),

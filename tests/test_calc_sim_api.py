@@ -55,7 +55,7 @@ def test_emerald_gauntlet_defaults_to_hardcore_rules_and_bag_healing() -> None:
     assert request.allow_revives is False
     assert request.healing_mode == "bag"
     assert request.hint_mode is False
-    assert request.leveling_policy == "party-max"
+    assert request.leveling_policy == "boss-cap"
 
 
 def test_corgi_to_chelle_has_reusable_cartridge_playbook() -> None:
@@ -186,6 +186,84 @@ def test_emerald_rare_candy_applies_level_evolution_and_prompted_moves() -> None
     )
     raised = server._emerald_rare_candy_raise(swampert, 53, calculator)
     assert raised.known_moves == ("Protect", "Ice Beam", "Earthquake", "Surf")
+
+
+def test_emerald_tate_prep_evolves_marshtomp_without_inventing_optional_tms() -> None:
+    calculator = DamageCalculator(game_mode="pokemon-emerald")
+    marshtomp = PlannedMember(
+        "MARSHTOMP", "marshtomp", 17, 48, 48,
+        ("Tackle", "Growl", "Mud-Slap", "Water Gun"),
+    )
+
+    raised = server._emerald_rare_candy_raise(marshtomp, 42, calculator)
+
+    assert raised.species == "swampert"
+    assert raised.level == 42
+    assert raised.known_moves == ("Take Down", "Mud-Slap", "Muddy Water", "Surf")
+    assert "Ice Beam" not in raised.known_moves
+    assert "Protect" not in raised.known_moves
+
+
+def test_emerald_checkpoint_dedupe_keeps_newest_named_snapshot_only() -> None:
+    older = PlannedMember("Fables", "Dustox", 14, 40, 40, ("Confusion",))
+    newer = PlannedMember("Fables", "Dustox", 31, 80, 80, ("Psybeam",))
+    first = PlannedMember("ZIGZAGOON", "Zigzagoon", 8, 30, 30, ("Tackle",))
+    second = PlannedMember("ZIGZAGOON", "Zigzagoon", 9, 32, 32, ("Headbutt",))
+
+    deduped = server._dedupe_emerald_roster_snapshots([older, first, newer, second])
+
+    assert [(member.name, member.level) for member in deduped] == [
+        ("Fables", 31), ("ZIGZAGOON", 8), ("ZIGZAGOON", 9),
+    ]
+
+
+def test_reordering_doubles_leads_preserves_required_boss_metadata() -> None:
+    calculator = DamageCalculator(game_mode="pokemon-emerald")
+    battles = server.load_trainer_battles_for_mode("pokemon-emerald")
+    request = server.CalcSimRequest(
+        trainer_id=362,
+        game_mode="pokemon-emerald",
+        enemy_leads=[0, 1],
+    )
+
+    reordered = server._trainer_for_calc_request(request, calculator, battles)
+
+    assert reordered.trainer_name == "Leader Tate&Liza [2]"
+    assert reordered.required is True
+    assert reordered.map_location == "Mossdeep City"
+    assert reordered.source_row == battles[362].source_row
+
+
+def test_emerald_gauntlet_prefers_deathless_main_line_over_all_crits_sacrifice(monkeypatch) -> None:
+    member = PlannedMember("Safe", "Swampert", 46, 150, 150, ("Surf",), slot=0)
+    trainer = TrainerBattle(
+        "Gym", "Sootopolis Gym", "Leader Test", False,
+        (TrainerPokemon("Luvdisc", 41, None, None, None, ("Water Pulse",)),),
+        required=True,
+    )
+
+    def simulated(roster, *_args, force_enemy_crits=False, **_kwargs):
+        payload = server._member_payload(roster[0])
+        payload["hp"] = 0 if force_enemy_crits else payload["max_hp"]
+        return {
+            "result": "win-line", "confidence": 0.8 if force_enemy_crits else 1.0,
+            "team": [payload], "enemies": [{"name": "Luvdisc", "hp": 0, "max_hp": 90}],
+            "turns": [{"turn": 1, "action": "Safe uses Surf."}],
+            "team_selection": {"chosen": ["Safe"], "indices": [0]},
+        }
+
+    monkeypatch.setattr(server, "_run_text_calc_sim_with_team_select", simulated)
+    monkeypatch.setattr(server, "_alternate_answer_lines", lambda *_args, **_kwargs: [])
+
+    result = server._run_calc_gauntlet(
+        [member], [trainer], DamageCalculator(game_mode="pokemon-emerald"),
+        max_turns=10, force_enemy_crits=True, heal_between=True,
+        leveling_policy="none", deathless_required=True, max_total_faints=0,
+    )
+
+    assert result["result"] == "route-complete"
+    assert result["fights"][0]["ending_team"][0]["hp"] == 150
+    assert result["fights"][0]["critical_stress_test"]["fainted"] == ["Safe"]
 
 
 def test_gauntlet_hands_final_hp_to_the_next_trainer(monkeypatch) -> None:
